@@ -1,3 +1,4 @@
+use std::mem;
 use mollusk_svm::result::{Check, ProgramResult};
 use mollusk_svm::{program, Mollusk};
 use solana_sdk::account::Account;
@@ -11,7 +12,7 @@ use alloc::vec;
 use aqua_swap::instructions::Initialize;
 use aqua_swap::states::{to_bytes, MyState};
 use solana_sdk::rent::Rent;
-use solana_sdk::sysvar::Sysvar;
+// use solana_sdk::sysvar::Sysvar;
 
 pub const PROGRAM: Pubkey = pubkey!("26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ");
 
@@ -27,7 +28,7 @@ pub fn mollusk() -> Mollusk {
 pub fn get_rent_data() -> Vec<u8> {
     let rent = Rent::default();
     unsafe {
-        core::slice::from_raw_parts(&rent as *const Rent as *const u8, Rent::size_of()).to_vec()
+        core::slice::from_raw_parts(&rent as *const Rent as *const u8, mem::size_of::<Rent>()).to_vec()
     }
 }
 
@@ -45,8 +46,8 @@ fn test_initialize_mystate() {
     //Initialize the accounts
     let payer_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
     let mystate_account = Account::new(0, 0, &system_program);
-    let min_balance = mollusk.sysvars.rent.minimum_balance(Rent::size_of());
-    let mut rent_account = Account::new(min_balance, Rent::size_of(), &RENT);
+    let min_balance = mollusk.sysvars.rent.minimum_balance(mem::size_of::<Rent>());
+    let mut rent_account = Account::new(min_balance, mem::size_of::<Rent>(), &RENT);
     rent_account.data = get_rent_data();
 
     //Push the accounts in to the instruction_accounts vec!
