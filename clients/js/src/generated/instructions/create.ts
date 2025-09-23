@@ -35,7 +35,7 @@ import {
   getCreateDataEncoder,
   type CreateData,
   type CreateDataArgs,
-} from '../types';
+} from '../accounts';
 
 export const CREATE_DISCRIMINATOR = 0;
 
