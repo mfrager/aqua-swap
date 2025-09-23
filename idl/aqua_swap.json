@@ -60,6 +60,92 @@
         "type": "u8",
         "value": 0
       }
+    },
+    {
+      "name": "Swap",
+      "accounts": [
+        {
+          "name": "userAcc",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "User account"
+          ]
+        },
+        {
+          "name": "swapAcc",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Swap account"
+          ]
+        },
+        {
+          "name": "vaultBaseAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Base vault"
+          ]
+        },
+        {
+          "name": "vaultQuoteAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Quote vault"
+          ]
+        },
+        {
+          "name": "userBaseAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "User base token"
+          ]
+        },
+        {
+          "name": "userQuoteAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "User quote token"
+          ]
+        },
+        {
+          "name": "baseMintAcc",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Base mint"
+          ]
+        },
+        {
+          "name": "quoteMintAcc",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Quote mint"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "swapData",
+          "type": {
+            "defined": "SwapData"
+          }
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 1
+      }
     }
   ],
   "accounts": [
@@ -123,10 +209,31 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidInstructionData"
+            "name": "InvalidParameters"
           },
           {
             "name": "InvalidPDA"
+          },
+          {
+            "name": "WrongOwnerBase"
+          },
+          {
+            "name": "WrongOwnerQuote"
+          },
+          {
+            "name": "WrongMintBase"
+          },
+          {
+            "name": "WrongMintQuote"
+          },
+          {
+            "name": "WrongVaultBase"
+          },
+          {
+            "name": "WrongVaultQuote"
+          },
+          {
+            "name": "SameMint"
           }
         ]
       }

@@ -16,8 +16,15 @@ import {
 } from '@solana/kit';
 
 export enum SwapError {
-  InvalidInstructionData,
+  InvalidParameters,
   InvalidPDA,
+  WrongOwnerBase,
+  WrongOwnerQuote,
+  WrongMintBase,
+  WrongMintQuote,
+  WrongVaultBase,
+  WrongVaultQuote,
+  SameMint,
 }
 
 export type SwapErrorArgs = SwapError;

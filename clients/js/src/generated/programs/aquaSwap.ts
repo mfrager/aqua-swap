@@ -12,7 +12,10 @@ import {
   type Address,
   type ReadonlyUint8Array,
 } from '@solana/kit';
-import { type ParsedCreateInstruction } from '../instructions';
+import {
+  type ParsedCreateInstruction,
+  type ParsedSwapInstruction,
+} from '../instructions';
 
 export const AQUA_SWAP_PROGRAM_ADDRESS =
   '26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ' as Address<'26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ'>;
@@ -24,6 +27,7 @@ export enum AquaSwapAccount {
 
 export enum AquaSwapInstruction {
   Create,
+  Swap,
 }
 
 export function identifyAquaSwapInstruction(
@@ -33,6 +37,9 @@ export function identifyAquaSwapInstruction(
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return AquaSwapInstruction.Create;
   }
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+    return AquaSwapInstruction.Swap;
+  }
   throw new Error(
     'The provided instruction could not be identified as a aquaSwap instruction.'
   );
@@ -40,6 +47,10 @@ export function identifyAquaSwapInstruction(
 
 export type ParsedAquaSwapInstruction<
   TProgram extends string = '26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ',
-> = {
-  instructionType: AquaSwapInstruction.Create;
-} & ParsedCreateInstruction<TProgram>;
+> =
+  | ({
+      instructionType: AquaSwapInstruction.Create;
+    } & ParsedCreateInstruction<TProgram>)
+  | ({
+      instructionType: AquaSwapInstruction.Swap;
+    } & ParsedSwapInstruction<TProgram>);
