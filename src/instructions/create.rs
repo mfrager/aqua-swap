@@ -6,6 +6,7 @@ use pinocchio::{
     sysvars::rent::Rent,
     ProgramResult,
 };
+use shank::ShankAccount;
 use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
 
@@ -18,7 +19,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct CreateData {
     pub uuid: u128,
     pub price: u64,

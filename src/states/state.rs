@@ -1,4 +1,5 @@
 use super::utils::{load_acc_mut_unchecked, DataLen};
+use shank::ShankAccount;
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -9,14 +10,14 @@ use pinocchio::{
 use crate::{errors::SwapError, instructions::CreateData};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct SwapState {
-    pub bump_seed: u8,
-    pub uuid: u128,
-    pub price: u64,
     pub owner: Pubkey,
     pub base: Pubkey,
     pub quote: Pubkey,
+    pub uuid: u128,
+    pub price: u64,
+    pub bump_seed: u8,
 }
 
 impl DataLen for SwapState {
