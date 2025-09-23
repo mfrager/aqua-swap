@@ -13,6 +13,7 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
+  type ParsedCloseInstruction,
   type ParsedCreateInstruction,
   type ParsedSwapInstruction,
 } from '../instructions';
@@ -29,6 +30,7 @@ export enum AquaSwapAccount {
 export enum AquaSwapInstruction {
   Create,
   Swap,
+  Close,
 }
 
 export function identifyAquaSwapInstruction(
@@ -40,6 +42,9 @@ export function identifyAquaSwapInstruction(
   }
   if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return AquaSwapInstruction.Swap;
+  }
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+    return AquaSwapInstruction.Close;
   }
   throw new Error(
     'The provided instruction could not be identified as a aquaSwap instruction.'
@@ -54,4 +59,7 @@ export type ParsedAquaSwapInstruction<
     } & ParsedCreateInstruction<TProgram>)
   | ({
       instructionType: AquaSwapInstruction.Swap;
-    } & ParsedSwapInstruction<TProgram>);
+    } & ParsedSwapInstruction<TProgram>)
+  | ({
+      instructionType: AquaSwapInstruction.Close;
+    } & ParsedCloseInstruction<TProgram>);

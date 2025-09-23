@@ -6,5 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './close';
 export * from './create';
 export * from './swap';

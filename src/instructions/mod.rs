@@ -2,17 +2,17 @@ use pinocchio::program_error::ProgramError;
 
 pub mod create;
 pub mod swap;
-// pub mod close;
+pub mod close;
 
 pub use create::*;
 pub use swap::*;
-// pub use close::*;
+pub use close::*;
 
 #[repr(u8)]
 pub enum SwapProgramInstruction {
     Create,
     Swap,
-    // Close,
+    Close,
 }
 
 impl TryFrom<&u8> for SwapProgramInstruction {
@@ -22,7 +22,7 @@ impl TryFrom<&u8> for SwapProgramInstruction {
         match *value {
             0 => Ok(SwapProgramInstruction::Create),
             1 => Ok(SwapProgramInstruction::Swap),
-            // 1 => Ok(SwapProgramInstruction::Close),
+            2 => Ok(SwapProgramInstruction::Close),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
@@ -53,11 +53,11 @@ mod idl_gen {
         #[account(7, name = "quote_mint_acc", desc = "Quote mint")]
         #[account(8, name = "token_program")]
         Swap(SwapData),
-/*        #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
+        #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
         #[account(1, writable, name = "swap_acc", desc = "Swap account")]
         #[account(2, writable, name = "vault_base_acc", desc = "Base vault")]
         #[account(3, writable, name = "owner_base_acc", desc = "Owner base token")]
         #[account(4, name = "token_program")]
-        Close, */
+        Close,
     }
 }

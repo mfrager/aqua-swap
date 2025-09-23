@@ -34,5 +34,9 @@ fn process_instruction(
             pinocchio_log::log!("Entrypoint: calling swap");
             instructions::swap(accounts, instruction_data)
         },
+        SwapProgramInstruction::Close => {
+            pinocchio_log::log!("Entrypoint: calling close");
+            instructions::close(accounts, instruction_data)
+        },
     }
 }

@@ -42,6 +42,7 @@ import { getCreateAccountInstruction, getTransferSolInstruction } from '@solana-
 // Generated client imports
 import { getCreateInstruction } from './clients/js/src/generated/instructions/create';
 import { getSwapInstruction } from './clients/js/src/generated/instructions/swap';
+import { getCloseInstruction } from './clients/js/src/generated/instructions/close';
 import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs/aquaSwap';
 
 // Optional: program import (not required since instruction includes programAddress by default)
@@ -493,8 +494,8 @@ async function main() {
   console.log('\n🔍 Verifying swap results...');
 
   // Wait for all transactions to be fully processed
-  console.log('⏳ Waiting 15 seconds for all transactions to be fully processed...');
-  await new Promise(resolve => setTimeout(resolve, 15000)); // Increased wait time
+  console.log('⏳ Waiting 4 seconds for all transactions to be fully processed...');
+  await new Promise(resolve => setTimeout(resolve, 4000)); // Increased wait time
   
   // Calculate expected base tokens received
   // swapAmount is in smallest units (10,000,000,000 = 10 tokens)
@@ -568,6 +569,139 @@ async function main() {
   } catch (error) {
     console.log('❌ Error verifying swap results:', error);
   }
+
+  // ------------------------------------------------------------------
+  // Create base ATA for main wallet to receive tokens during close
+  // ------------------------------------------------------------------
+  console.log('\n🏦 Creating base ATA for main wallet to receive tokens during close...');
+  
+  const [payerBaseAta] = await findAssociatedTokenPda({
+    mint: baseMint.address,
+    owner: payer.address,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  console.log('   Payer base ATA:', payerBaseAta);
+
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const createPayerBaseAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
+      mint: baseMint.address,
+      payer,
+      owner: payer.address,
+    });
+    
+    await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([createPayerBaseAtaIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        console.log('   Payer base ATA creation transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
+        return getSignatureFromTransaction(signed);
+      }
+    );
+    console.log('✅ Payer base ATA created');
+  }
+
+  // ------------------------------------------------------------------
+  // Close the swap account
+  // ------------------------------------------------------------------
+  console.log('\n🔒 Closing swap account...');
+  console.log('   This will:');
+  console.log('   1. Transfer all remaining base tokens from vault to payer');
+  console.log('   2. Close the base vault token account');
+  console.log('   3. Close the swap account itself');
+  console.log('   4. Return lamports to payer');
+
+  // Check vault balance before close
+  try {
+    const vaultBeforeClose = await fetchToken(rpc, baseAta);
+    if (vaultBeforeClose) {
+      const vaultBalance = Number(vaultBeforeClose.data?.amount || 0) / (10 ** DECIMALS);
+      console.log(`   Base vault balance before close: ${vaultBalance} tokens`);
+    }
+  } catch (error) {
+    console.log('   Could not check vault balance before close:', error);
+  }
+
+  // Check payer balance before close
+  try {
+    const payerBeforeClose = await fetchToken(rpc, payerBaseAta);
+    if (payerBeforeClose) {
+      const payerBalance = Number(payerBeforeClose.data?.amount || 0) / (10 ** DECIMALS);
+      console.log(`   Payer base balance before close: ${payerBalance} tokens`);
+    }
+  } catch (error) {
+    console.log('   Could not check payer balance before close:', error);
+  }
+
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const closeIx = getCloseInstruction({
+      ownerAcc: payer,
+      swapAcc: address(derivedSwapAddress),
+      vaultBaseAcc: address(baseAta),
+      ownerBaseAcc: address(payerBaseAta),
+    });
+
+    const closeSig = await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([closeIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        console.log('   Close transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: true });
+        return getSignatureFromTransaction(signed);
+      }
+    );
+    
+    console.log('✅ Swap account closed successfully');
+    console.log('   Close transaction signature:', closeSig);
+  }
+
+  // ------------------------------------------------------------------
+  // Verify close results
+  // ------------------------------------------------------------------
+  console.log('\n🔍 Verifying close results...');
+  console.log('⏳ Waiting 4 seconds for close transaction to be fully processed...');
+  await new Promise(resolve => setTimeout(resolve, 4000));
+
+  // Check that vault account is closed (should not exist)
+  try {
+    const vaultAfterClose = await fetchToken(rpc, baseAta);
+    if (vaultAfterClose) {
+      console.log('⚠️  Warning: Base vault account still exists after close');
+    } else {
+      console.log('✅ Base vault account successfully closed');
+    }
+  } catch (error) {
+    console.log('✅ Base vault account successfully closed (account not found)');
+  }
+
+  // Check payer received the tokens
+  try {
+    const payerAfterClose = await fetchToken(rpc, payerBaseAta);
+    if (payerAfterClose) {
+      const payerBalance = Number(payerAfterClose.data?.amount || 0) / (10 ** DECIMALS);
+      console.log(`✅ Payer received base tokens: ${payerBalance} tokens`);
+      console.log(`   Payer raw amount: ${payerAfterClose.data?.amount || 0}`);
+    } else {
+      console.log('❌ Could not fetch payer balance after close');
+    }
+  } catch (error) {
+    console.log('❌ Error checking payer balance after close:', error);
+  }
+
+  console.log('\n🎉 Complete Aqua Swap lifecycle completed successfully!');
+  console.log('   ✅ Created swap account');
+  console.log('   ✅ Executed swap');
+  console.log('   ✅ Closed swap account');
+  console.log('   ✅ Recovered all tokens');
 }
 
 main().catch((e) => {

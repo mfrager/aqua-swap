@@ -146,6 +146,53 @@
         "type": "u8",
         "value": 1
       }
+    },
+    {
+      "name": "Close",
+      "accounts": [
+        {
+          "name": "ownerAcc",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Owner account"
+          ]
+        },
+        {
+          "name": "swapAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Swap account"
+          ]
+        },
+        {
+          "name": "vaultBaseAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Base vault"
+          ]
+        },
+        {
+          "name": "ownerBaseAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Owner base token"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 2
+      }
     }
   ],
   "accounts": [
