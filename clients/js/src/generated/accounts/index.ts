@@ -7,4 +7,5 @@
  */
 
 export * from './createData';
+export * from './swapData';
 export * from './swapState';

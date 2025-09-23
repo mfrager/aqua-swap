@@ -22,6 +22,7 @@ export const AQUA_SWAP_PROGRAM_ADDRESS =
 
 export enum AquaSwapAccount {
   CreateData,
+  SwapData,
   SwapState,
 }
 

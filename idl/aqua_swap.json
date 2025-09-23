@@ -170,6 +170,18 @@
       }
     },
     {
+      "name": "SwapData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quoteIn",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "SwapState",
       "type": {
         "kind": "struct",

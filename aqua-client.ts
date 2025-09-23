@@ -35,10 +35,11 @@ import {
   getMintToInstruction,
   TOKEN_PROGRAM_ADDRESS
 } from '@solana-program/token';
-import { getCreateAccountInstruction } from '@solana-program/system';
+import { getCreateAccountInstruction, getTransferSolInstruction } from '@solana-program/system';
 
 // Generated client imports
 import { getCreateInstruction } from './clients/js/src/generated/instructions/create';
+import { getSwapInstruction } from './clients/js/src/generated/instructions/swap';
 import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs/aquaSwap';
 
 // Optional: program import (not required since instruction includes programAddress by default)
@@ -48,6 +49,8 @@ const RPC_URL = 'https://api.devnet.solana.com';
 const WS_URL = 'wss://api.devnet.solana.com';
 const DECIMALS = 9;
 const MINT_AMOUNT = 1000;
+const SWAP_QUOTE_AMOUNT = 100; // Amount of quote tokens to mint for swapping
+const FUNDING_AMOUNT = 0.5; // SOL to send to new keypair
 
 async function main() {
   console.log('🚀 Aqua Swap minimal client start');
@@ -247,6 +250,143 @@ async function main() {
 
   console.log('✅ Sent create() instruction');
   console.log('   Tx signature:', sig);
+
+  // ------------------------------------------------------------------
+  // Create new keypair for swap interaction and fund it with SOL
+  // ------------------------------------------------------------------
+  const swapUser = await generateKeyPairSigner();
+  console.log('\n👤 Created new swap user:', swapUser.address);
+
+  // Fund the new keypair with 0.5 SOL
+  console.log('💰 Funding swap user with', FUNDING_AMOUNT, 'SOL');
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const transferIx = getTransferSolInstruction({
+      source: payer,
+      destination: swapUser.address,
+      amount: BigInt(FUNDING_AMOUNT * 1e9), // Convert SOL to lamports
+    });
+    await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([transferIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
+        return null as unknown as string;
+      }
+    );
+    console.log('✅ Swap user funded');
+  }
+
+  // ------------------------------------------------------------------
+  // Create ATAs for the swap user for both base and quote tokens
+  // ------------------------------------------------------------------
+  const [swapUserBaseAta] = await findAssociatedTokenPda({
+    mint: baseMint.address,
+    owner: swapUser.address,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  const [swapUserQuoteAta] = await findAssociatedTokenPda({
+    mint: quoteMint.address,
+    owner: swapUser.address,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  console.log('🏦 Creating ATAs for swap user:');
+  console.log('   Base ATA:', swapUserBaseAta);
+  console.log('   Quote ATA:', swapUserQuoteAta);
+
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const createBaseAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
+      mint: baseMint.address,
+      payer,
+      owner: swapUser.address,
+    });
+    const createQuoteAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
+      mint: quoteMint.address,
+      payer,
+      owner: swapUser.address,
+    });
+    await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([createBaseAtaIx, createQuoteAtaIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
+        return null as unknown as string;
+      }
+    );
+    console.log('✅ Swap user ATAs created');
+  }
+
+  // ------------------------------------------------------------------
+  // Mint quote tokens to swap user's ATA
+  // ------------------------------------------------------------------
+  console.log('🪙 Minting', SWAP_QUOTE_AMOUNT, 'quote tokens to swap user');
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const mintQuoteToSwapUserIx = getMintToInstruction({
+      mint: quoteMint.address,
+      token: swapUserQuoteAta,
+      amount: BigInt(SWAP_QUOTE_AMOUNT) * BigInt(10 ** DECIMALS),
+      mintAuthority: payer.address,
+    });
+    await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([mintQuoteToSwapUserIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
+        return null as unknown as string;
+      }
+    );
+    console.log('✅ Quote tokens minted to swap user');
+  }
+
+  // ------------------------------------------------------------------
+  // Execute swap: swap user trades quote tokens for base tokens
+  // ------------------------------------------------------------------
+  console.log('\n🔄 Executing swap: swap user trades quote tokens for base tokens');
+  const swapAmount = BigInt(10) * BigInt(10 ** DECIMALS); // 10 quote tokens
+  
+  const swapIx = getSwapInstruction({
+    userAcc: swapUser,
+    swapAcc: address(derivedSwapAddress),
+    vaultBaseAcc: address(baseAta),
+    vaultQuoteAcc: address(userQuoteAta),
+    userBaseAcc: address(swapUserBaseAta),
+    userQuoteAcc: address(swapUserQuoteAta),
+    baseMintAcc: address(baseMint.address),
+    quoteMintAcc: address(quoteMint.address),
+    swapData: {
+      quote_in: swapAmount
+    }
+  });
+
+  {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const swapSig = await pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(swapUser, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions([swapIx], tx),
+      async (tx) => {
+        const signed = await signTransactionMessageWithSigners(tx);
+        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: true });
+        return getSignatureFromTransaction(signed);
+      }
+    );
+    console.log('✅ Swap executed successfully');
+    console.log('   Swap tx signature:', swapSig);
+    console.log('   Swapped:', swapAmount.toString(), 'quote tokens for base tokens');
+  }
 }
 
 main().catch((e) => {

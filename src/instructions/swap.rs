@@ -9,6 +9,7 @@ use pinocchio_token::{
     instructions::TransferChecked,
     state::{TokenAccount, Mint},
 };
+use shank::ShankAccount;
 
 use crate::states::{
     utils::{load_acc_unchecked, DataLen},
@@ -18,12 +19,10 @@ use crate::errors::SwapError;
 use core::u64;
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct SwapData {
     /// Amount of quote tokens the user is willing to pay.
     pub quote_in: u64,
-    /// Minimum amount of base tokens the user expects to receive (slippage protection).
-    pub min_base_out: u64,
 }
 
 impl DataLen for SwapData {
@@ -134,7 +133,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     }
     .invoke_signed(&signers)?;
 
-    log!("Swap executed: quote_in={} -> base_out={}", swap_data.quote_in, base_out);
+    log!("Swap executed: quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
     Ok(())
 }
 
