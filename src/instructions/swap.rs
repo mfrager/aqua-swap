@@ -31,6 +31,7 @@ impl DataLen for SwapData {
 
 pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     log!("Starting Aqua Swap: swap");
+    log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
 
     // Accounts as declared in instructions/mod.rs (idl_gen::Swap):
     // 0 user_acc (signer, writable),
@@ -50,6 +51,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
+    log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
     if data.len() != SwapData::LEN {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -60,43 +62,59 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Load swap state
     let swap_state = unsafe { load_acc_unchecked::<SwapState>(swap_acc.borrow_data_unchecked()) }?;
+    log!("Begin swap");
 
-    // Validate vault token accounts and user token accounts
+    // Decode all accounts once and extract needed values
     let vault_base = TokenAccount::from_account_info(vault_base_acc)?;
     let vault_quote = TokenAccount::from_account_info(vault_quote_acc)?;
     let user_base = TokenAccount::from_account_info(user_base_acc)?;
     let user_quote = TokenAccount::from_account_info(user_quote_acc)?;
-
     let base_mint = Mint::from_account_info(base_mint_acc)?;
     let quote_mint = Mint::from_account_info(quote_mint_acc)?;
+
+    // Extract all needed values immediately
+    let vault_base_owner = *vault_base.owner();
+    let vault_quote_owner = *vault_quote.owner();
+    let vault_base_mint = *vault_base.mint();
+    let vault_quote_mint = *vault_quote.mint();
+    let user_base_mint = *user_base.mint();
+    let user_quote_mint = *user_quote.mint();
     let base_decimals = base_mint.decimals();
     let quote_decimals = quote_mint.decimals();
 
-    // Ownership & mint invariants + mint matchingA
+    // Ownership & mint invariants + mint matching
     if swap_state.base != *vault_base_acc.key() {
         return Err(crate::errors::SwapError::WrongVaultBase.into());
     }
     if swap_state.quote != *vault_quote_acc.key() {
         return Err(crate::errors::SwapError::WrongVaultQuote.into());
     }
-    if vault_base.owner() != swap_acc.key() {
+    if vault_base_owner != *swap_acc.key() {
         return Err(crate::errors::SwapError::WrongOwnerBase.into());
     }
-    if vault_quote.owner() == swap_acc.key() {
+    if vault_quote_owner == *swap_acc.key() {
         return Err(crate::errors::SwapError::WrongOwnerQuote.into());
     }
-    if vault_base.mint() != user_base.mint() {
+    if vault_base_mint != user_base_mint {
         return Err(crate::errors::SwapError::WrongMintBase.into());
     }
-    if vault_quote.mint() != user_quote.mint() {
+    if vault_quote_mint != user_quote_mint {
         return Err(crate::errors::SwapError::WrongMintQuote.into());
     }
-    if vault_base.mint() != base_mint_acc.key() {
+    if vault_base_mint != *base_mint_acc.key() {
         return Err(crate::errors::SwapError::WrongMintBase.into());
     }
-    if vault_quote.mint() != quote_mint_acc.key() {
+    if vault_quote_mint != *quote_mint_acc.key() {
         return Err(crate::errors::SwapError::WrongMintQuote.into());
     }
+
+    // Drop the borrowed account structs to release borrows before transfers
+    drop(vault_base);
+    drop(vault_quote);
+    drop(user_base);
+    drop(user_quote);
+    drop(base_mint);
+    drop(quote_mint);
 
     // Compute base_out (base smallest units) from quote_in (quote smallest units) and 1e9-scaled price.
     let quote_in_units: u128 = swap_data.quote_in as u128;

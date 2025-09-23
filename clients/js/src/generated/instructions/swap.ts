@@ -35,7 +35,7 @@ import {
   getSwapDataEncoder,
   type SwapData,
   type SwapDataArgs,
-} from '../types';
+} from '../accounts';
 
 export const SWAP_DISCRIMINATOR = 1;
 

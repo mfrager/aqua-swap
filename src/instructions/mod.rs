@@ -1,18 +1,18 @@
 use pinocchio::program_error::ProgramError;
 
 pub mod create;
-// pub mod close;
 pub mod swap;
+// pub mod close;
 
 pub use create::*;
-// pub use close::*;
 pub use swap::*;
+// pub use close::*;
 
 #[repr(u8)]
 pub enum SwapProgramInstruction {
     Create,
-    // Close,
     Swap,
+    // Close,
 }
 
 impl TryFrom<&u8> for SwapProgramInstruction {
@@ -21,8 +21,8 @@ impl TryFrom<&u8> for SwapProgramInstruction {
     fn try_from(value: &u8) -> Result<Self, Self::Error> {
         match *value {
             0 => Ok(SwapProgramInstruction::Create),
+            1 => Ok(SwapProgramInstruction::Swap),
             // 1 => Ok(SwapProgramInstruction::Close),
-            2 => Ok(SwapProgramInstruction::Swap),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
@@ -43,12 +43,6 @@ mod idl_gen {
         #[account(4, name = "system_program")]
         #[account(5, name = "rent")]
         Create(CreateData),
-/*        #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
-        #[account(1, writable, name = "swap_acc", desc = "Swap account")]
-        #[account(2, writable, name = "vault_base_acc", desc = "Base vault")]
-        #[account(3, writable, name = "owner_base_acc", desc = "Owner base token")]
-        #[account(4, name = "token_program")]
-        Close, */
         #[account(0, writable, signer, name = "user_acc", desc = "User account")]
         #[account(1, name = "swap_acc", desc = "Swap account")]
         #[account(2, writable, name = "vault_base_acc", desc = "Base vault")]
@@ -59,5 +53,11 @@ mod idl_gen {
         #[account(7, name = "quote_mint_acc", desc = "Quote mint")]
         #[account(8, name = "token_program")]
         Swap(SwapData),
+/*        #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
+        #[account(1, writable, name = "swap_acc", desc = "Swap account")]
+        #[account(2, writable, name = "vault_base_acc", desc = "Base vault")]
+        #[account(3, writable, name = "owner_base_acc", desc = "Owner base token")]
+        #[account(4, name = "token_program")]
+        Close, */
     }
 }

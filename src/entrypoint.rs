@@ -20,11 +20,19 @@ fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    pinocchio_log::log!("Entrypoint: instruction_data len = {}", instruction_data.len());
     let (ix_disc, instruction_data) = instruction_data
         .split_first()
         .ok_or(ProgramError::InvalidInstructionData)?;
+    pinocchio_log::log!("Entrypoint: discriminator = {}", *ix_disc as u32);
     match SwapProgramInstruction::try_from(ix_disc)? {
-        SwapProgramInstruction::Create => instructions::create(accounts, instruction_data),
-        SwapProgramInstruction::Swap => instructions::swap(accounts, instruction_data),
+        SwapProgramInstruction::Create => {
+            pinocchio_log::log!("Entrypoint: calling create");
+            instructions::create(accounts, instruction_data)
+        },
+        SwapProgramInstruction::Swap => {
+            pinocchio_log::log!("Entrypoint: calling swap");
+            instructions::swap(accounts, instruction_data)
+        },
     }
 }
