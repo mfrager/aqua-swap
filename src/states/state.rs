@@ -2,39 +2,50 @@ use super::utils::{load_acc_mut_unchecked, DataLen};
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
-    pubkey::{self, Pubkey},
+    pubkey::Pubkey,
     ProgramResult,
 };
 
-use crate::{errors::MyProgramError, instructions::Initialize};
+use crate::{errors::SwapError, instructions::CreateData};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MyState {
+pub struct SwapState {
+    pub bump_seed: u8,
+    pub uuid: u128,
+    pub price: u64,
     pub owner: Pubkey,
+    pub base: Pubkey,
+    pub quote: Pubkey,
 }
 
-impl DataLen for MyState {
-    const LEN: usize = core::mem::size_of::<MyState>();
+impl DataLen for SwapState {
+    const LEN: usize = core::mem::size_of::<SwapState>();
 }
 
-impl MyState {
-    pub const SEED: &'static str = "init";
-
-    pub fn validate_pda(bump: u8, pda: &Pubkey, owner: &Pubkey) -> Result<(), ProgramError> {
-        let seed_with_bump = &[Self::SEED.as_bytes(), owner, &[bump]];
-        let derived = pubkey::create_program_address(seed_with_bump, &crate::ID)?;
+impl SwapState {
+    pub fn validate_pda(bump_seed: u8, uuid: u128, pda: &Pubkey) -> Result<(), ProgramError> {
+        let derived = pinocchio_pubkey::derive_address(&[&uuid.to_le_bytes()[..]], Some(bump_seed), &crate::ID);
         if derived != *pda {
-            return Err(MyProgramError::PdaMismatch.into());
+            return Err(SwapError::InvalidPDA.into());
         }
         Ok(())
     }
 
-    pub fn initialize(my_stata_acc: &AccountInfo, ix_data: &Initialize) -> ProgramResult {
-        let my_state =
-            unsafe { load_acc_mut_unchecked::<MyState>(my_stata_acc.borrow_mut_data_unchecked()) }?;
-
-        my_state.owner = ix_data.owner;
+    pub fn create_swap(
+        swap_acc: &AccountInfo,
+        owner_acc: &AccountInfo,
+        base_acc: &AccountInfo,
+        quote_acc: &AccountInfo,
+        create_data: &CreateData,
+    ) -> ProgramResult {
+        let swap_data = unsafe { load_acc_mut_unchecked::<SwapState>(swap_acc.borrow_mut_data_unchecked()) }?;
+        swap_data.price = create_data.price;
+        swap_data.uuid = create_data.uuid;
+        swap_data.bump_seed = create_data.bump_seed;
+        swap_data.owner = *owner_acc.key();
+        swap_data.base = *base_acc.key();
+        swap_data.quote = *quote_acc.key();
         Ok(())
     }
 }

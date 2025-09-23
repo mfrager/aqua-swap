@@ -1,6 +1,6 @@
 use pinocchio::program_error::ProgramError;
 
-use crate::errors::MyProgramError;
+use crate::errors::SwapError;
 
 pub trait DataLen {
     const LEN: usize;
@@ -25,7 +25,7 @@ pub unsafe fn load_acc_mut_unchecked<T: DataLen>(bytes: &mut [u8]) -> Result<&mu
 #[inline(always)]
 pub unsafe fn load_ix_data<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
-        return Err(MyProgramError::InvalidInstructionData.into());
+        return Err(SwapError::InvalidInstructionData.into());
     }
     Ok(&*(bytes.as_ptr() as *const T))
 }
