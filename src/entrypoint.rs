@@ -24,6 +24,7 @@ fn process_instruction(
         .split_first()
         .ok_or(ProgramError::InvalidInstructionData)?;
     match SwapProgramInstruction::try_from(ix_disc)? {
-        SwapProgramInstruction::Create => instructions::create(accounts, instruction_data)
+        SwapProgramInstruction::Create => instructions::create(accounts, instruction_data),
+        SwapProgramInstruction::Swap => instructions::swap(accounts, instruction_data),
     }
 }

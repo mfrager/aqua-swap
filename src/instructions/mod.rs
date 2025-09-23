@@ -2,17 +2,17 @@ use pinocchio::program_error::ProgramError;
 
 pub mod create;
 // pub mod close;
-// pub mod swap;
+pub mod swap;
 
 pub use create::*;
 // pub use close::*;
-// pub use swap::*;
+pub use swap::*;
 
 #[repr(u8)]
 pub enum SwapProgramInstruction {
     Create,
     // Close,
-    // Swap,
+    Swap,
 }
 
 impl TryFrom<&u8> for SwapProgramInstruction {
@@ -22,7 +22,7 @@ impl TryFrom<&u8> for SwapProgramInstruction {
         match *value {
             0 => Ok(SwapProgramInstruction::Create),
             // 1 => Ok(SwapProgramInstruction::Close),
-            // 2 => Ok(SwapProgramInstruction::Swap),
+            2 => Ok(SwapProgramInstruction::Swap),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
@@ -31,7 +31,7 @@ impl TryFrom<&u8> for SwapProgramInstruction {
 mod idl_gen {
     use super::{
         CreateData,
-        // SwapData,
+        SwapData,
     };
 
     #[derive(shank::ShankInstruction)]
@@ -49,13 +49,15 @@ mod idl_gen {
         #[account(3, writable, name = "owner_base_acc", desc = "Owner base token")]
         #[account(4, name = "token_program")]
         Close, */
-/*        #[account(0, writable, signer, name = "user_acc", desc = "User account")]
+        #[account(0, writable, signer, name = "user_acc", desc = "User account")]
         #[account(1, name = "swap_acc", desc = "Swap account")]
         #[account(2, writable, name = "vault_base_acc", desc = "Base vault")]
         #[account(3, writable, name = "vault_quote_acc", desc = "Quote vault")]
         #[account(4, writable, name = "user_base_acc", desc = "User base token")]
         #[account(5, writable, name = "user_quote_acc", desc = "User quote token")]
-        #[account(6, name = "token_program")]
-        Swap(SwapData), */
+        #[account(6, name = "base_mint_acc", desc = "Base mint")]
+        #[account(7, name = "quote_mint_acc", desc = "Quote mint")]
+        #[account(8, name = "token_program")]
+        Swap(SwapData),
     }
 }

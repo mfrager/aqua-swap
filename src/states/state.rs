@@ -9,7 +9,7 @@ use pinocchio::{
 
 use crate::{errors::SwapError, instructions::CreateData};
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct SwapState {
     pub owner: Pubkey,
