@@ -23,6 +23,8 @@ use core::u64;
 pub struct SwapData {
     /// Amount of quote tokens the user is willing to pay.
     pub quote_in: u64,
+    /// Bump seed for the temporary bonus quote PDA if needed, otherwise 0.
+    pub bump_seed: u8,
 }
 
 impl DataLen for SwapData {
