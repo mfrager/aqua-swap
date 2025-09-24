@@ -14,14 +14,6 @@
           ]
         },
         {
-          "name": "verifyAcc",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Verify account"
-          ]
-        },
-        {
           "name": "swapAcc",
           "isMut": true,
           "isSigner": false,
@@ -169,6 +161,11 @@
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "ataProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -257,10 +254,6 @@
           {
             "name": "bumpSeed",
             "type": "u8"
-          },
-          {
-            "name": "requireVerify",
-            "type": "bool"
           }
         ]
       }
@@ -284,10 +277,6 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "verify",
             "type": "publicKey"
           },
           {
@@ -320,10 +309,6 @@
           },
           {
             "name": "quoteSol",
-            "type": "bool"
-          },
-          {
-            "name": "requireVerify",
             "type": "bool"
           }
         ]

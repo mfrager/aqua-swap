@@ -7,7 +7,7 @@ use pinocchio::{
     ProgramResult,
 };
 use pinocchio_log::log;
-use aranya_base58::ToBase58;
+//use aranya_base58::ToBase58;
 
 use crate::{errors::SwapError, instructions::CreateData};
 
@@ -15,7 +15,6 @@ use crate::{errors::SwapError, instructions::CreateData};
 #[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct SwapState {
     pub owner: Pubkey,
-    pub verify: Pubkey,
     pub base: Pubkey,
     pub quote: Pubkey,
     pub uuid: u128,
@@ -24,7 +23,6 @@ pub struct SwapState {
     pub bonus_quote: u64,
     pub bump_seed: u8,
     pub quote_sol: bool,
-    pub require_verify: bool,
 }
 
 impl DataLen for SwapState {
@@ -34,10 +32,10 @@ impl DataLen for SwapState {
 impl SwapState {
     pub fn validate_pda(bump_seed: u8, uuid: u128, pda: &Pubkey) -> Result<(), ProgramError> {
         let derived = pinocchio_pubkey::derive_address(&[&uuid.to_le_bytes()[..]], Some(bump_seed), &crate::ID);
-        let pda_b58 = pda.to_base58();
+        /* let pda_b58 = pda.to_base58();
         log!("Validate PDA expected: {}", pda_b58.as_str());
         let derived_b58 = derived.to_base58();
-        log!("Validate PDA derived: {}", derived_b58.as_str());
+        log!("Validate PDA derived: {}", derived_b58.as_str()); */
         if derived != *pda {
             return Err(SwapError::InvalidPDA.into());
         }
@@ -47,7 +45,6 @@ impl SwapState {
     pub fn create_swap(
         swap_acc: &AccountInfo,
         owner_acc: &AccountInfo,
-        verify_acc: &AccountInfo,
         base_acc: &AccountInfo,
         quote_acc: &AccountInfo,
         create_data: &CreateData,
@@ -61,7 +58,6 @@ impl SwapState {
         swap_data.uuid = create_data.uuid;
         swap_data.bump_seed = create_data.bump_seed;
         swap_data.owner = *owner_acc.key();
-        swap_data.verify = *verify_acc.key();
         swap_data.base = *base_acc.key();
         if quote_sol {
             swap_data.quote = quote_owner;
@@ -73,8 +69,8 @@ impl SwapState {
         log!("SwapState uuid: {}", swap_data.uuid);
         log!("SwapState quote_sol: {}", swap_data.quote_sol);
         log!("SwapState price: {}", swap_data.price / 1_000_000_000);
-        log!("SwapState bonus_base: {}", swap_data.bonus_base);
-        log!("SwapState bonus_quote: {}", swap_data.bonus_quote);
+        log!("SwapState bonus_base: {}%", swap_data.bonus_base / 1_000_000_000);
+        log!("SwapState bonus_quote: {}%", swap_data.bonus_quote / 1_000_000_000);
 
         Ok(())
     }

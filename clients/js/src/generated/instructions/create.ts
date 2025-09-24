@@ -46,7 +46,6 @@ export function getCreateDiscriminatorBytes() {
 export type CreateInstruction<
   TProgram extends string = typeof AQUA_SWAP_PROGRAM_ADDRESS,
   TAccountOwnerAcc extends string | AccountMeta<string> = string,
-  TAccountVerifyAcc extends string | AccountMeta<string> = string,
   TAccountSwapAcc extends string | AccountMeta<string> = string,
   TAccountVaultBaseAcc extends string | AccountMeta<string> = string,
   TAccountVaultQuoteAcc extends string | AccountMeta<string> = string,
@@ -65,9 +64,6 @@ export type CreateInstruction<
         ? WritableSignerAccount<TAccountOwnerAcc> &
             AccountSignerMeta<TAccountOwnerAcc>
         : TAccountOwnerAcc,
-      TAccountVerifyAcc extends string
-        ? ReadonlyAccount<TAccountVerifyAcc>
-        : TAccountVerifyAcc,
       TAccountSwapAcc extends string
         ? WritableAccount<TAccountSwapAcc>
         : TAccountSwapAcc,
@@ -123,7 +119,6 @@ export function getCreateInstructionDataCodec(): Codec<
 
 export type CreateInput<
   TAccountOwnerAcc extends string = string,
-  TAccountVerifyAcc extends string = string,
   TAccountSwapAcc extends string = string,
   TAccountVaultBaseAcc extends string = string,
   TAccountVaultQuoteAcc extends string = string,
@@ -132,8 +127,6 @@ export type CreateInput<
 > = {
   /** Owner account */
   ownerAcc: TransactionSigner<TAccountOwnerAcc>;
-  /** Verify account */
-  verifyAcc: Address<TAccountVerifyAcc>;
   /** Swap account */
   swapAcc: Address<TAccountSwapAcc>;
   /** Base vault */
@@ -147,7 +140,6 @@ export type CreateInput<
 
 export function getCreateInstruction<
   TAccountOwnerAcc extends string,
-  TAccountVerifyAcc extends string,
   TAccountSwapAcc extends string,
   TAccountVaultBaseAcc extends string,
   TAccountVaultQuoteAcc extends string,
@@ -157,7 +149,6 @@ export function getCreateInstruction<
 >(
   input: CreateInput<
     TAccountOwnerAcc,
-    TAccountVerifyAcc,
     TAccountSwapAcc,
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
@@ -168,7 +159,6 @@ export function getCreateInstruction<
 ): CreateInstruction<
   TProgramAddress,
   TAccountOwnerAcc,
-  TAccountVerifyAcc,
   TAccountSwapAcc,
   TAccountVaultBaseAcc,
   TAccountVaultQuoteAcc,
@@ -181,7 +171,6 @@ export function getCreateInstruction<
   // Original accounts.
   const originalAccounts = {
     ownerAcc: { value: input.ownerAcc ?? null, isWritable: true },
-    verifyAcc: { value: input.verifyAcc ?? null, isWritable: false },
     swapAcc: { value: input.swapAcc ?? null, isWritable: true },
     vaultBaseAcc: { value: input.vaultBaseAcc ?? null, isWritable: false },
     vaultQuoteAcc: { value: input.vaultQuoteAcc ?? null, isWritable: false },
@@ -210,7 +199,6 @@ export function getCreateInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.ownerAcc),
-      getAccountMeta(accounts.verifyAcc),
       getAccountMeta(accounts.swapAcc),
       getAccountMeta(accounts.vaultBaseAcc),
       getAccountMeta(accounts.vaultQuoteAcc),
@@ -224,7 +212,6 @@ export function getCreateInstruction<
   } as CreateInstruction<
     TProgramAddress,
     TAccountOwnerAcc,
-    TAccountVerifyAcc,
     TAccountSwapAcc,
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
@@ -241,16 +228,14 @@ export type ParsedCreateInstruction<
   accounts: {
     /** Owner account */
     ownerAcc: TAccountMetas[0];
-    /** Verify account */
-    verifyAcc: TAccountMetas[1];
     /** Swap account */
-    swapAcc: TAccountMetas[2];
+    swapAcc: TAccountMetas[1];
     /** Base vault */
-    vaultBaseAcc: TAccountMetas[3];
+    vaultBaseAcc: TAccountMetas[2];
     /** Quote vault */
-    vaultQuoteAcc: TAccountMetas[4];
-    systemProgram: TAccountMetas[5];
-    rent: TAccountMetas[6];
+    vaultQuoteAcc: TAccountMetas[3];
+    systemProgram: TAccountMetas[4];
+    rent: TAccountMetas[5];
   };
   data: CreateInstructionData;
 };
@@ -263,7 +248,7 @@ export function parseCreateInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedCreateInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
+  if (instruction.accounts.length < 6) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -277,7 +262,6 @@ export function parseCreateInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       ownerAcc: getNextAccount(),
-      verifyAcc: getNextAccount(),
       swapAcc: getNextAccount(),
       vaultBaseAcc: getNextAccount(),
       vaultQuoteAcc: getNextAccount(),

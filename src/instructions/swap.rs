@@ -4,6 +4,7 @@ use pinocchio::{
     program_error::ProgramError,
     ProgramResult,
 };
+use aranya_base58::ToBase58;
 use pinocchio_log::log;
 use pinocchio_token::{
     instructions::{TransferChecked, CloseAccount},
@@ -49,6 +50,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         wsol_temp_acc,
         token_program_acc,
         system_program_acc,
+        _ata_program_acc,
     ] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -155,6 +157,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     // Transfer quote from user to vault_quot
     if swap_state.quote_sol {
         // Idempotent create WSOL ATA
+        log!("Create temp WSOL ATA");
         CreateIdempotent {
             funding_account: user_acc,
             account: wsol_temp_acc,
@@ -166,6 +169,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         .invoke_signed(&signers)?;
 
         // First tranfer from user
+        log!("Transfer quote from user to temp WSOL ATA");
         TransferChecked {
             from: user_quote_acc,
             mint: quote_mint_acc, // WSOL
@@ -176,6 +180,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         }
         .invoke()?;
 
+        log!("Close temp WSOL ATA");
         CloseAccount {
             account: wsol_temp_acc,
             destination: user_acc,
@@ -184,6 +189,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         .invoke_signed(&signers)?;
         
         // Transfer SOL from user acc to swap_state.quote
+        log!("Transfer SOL from user to vault");
         Transfer {
             from: user_acc,
             to: vault_quote_acc,

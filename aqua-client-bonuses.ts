@@ -170,7 +170,6 @@ async function main() {
     const { value: bh } = await rpc.getLatestBlockhash().send();
     const createIx = getCreateInstruction({
       ownerAcc: payer,
-      verifyAcc: payer.address,
       swapAcc: address(swapPda),
       vaultBaseAcc: address(baseVaultAta),
       vaultQuoteAcc: address(quoteVaultAta),
@@ -180,7 +179,6 @@ async function main() {
         bonusBase: Number(BONUS_PERCENT),
         bonusQuote: Number(BONUS_PERCENT),
         bumpSeed: Number(bumpSeed),
-        requireVerify: false,
       },
     });
     await pipe(
@@ -264,7 +262,7 @@ async function main() {
 
   // Helper to fetch token amount (raw u64)
   const getAmount = async (tokenAddr: string) => {
-    const acc = await fetchToken(rpc, tokenAddr);
+    const acc = await fetchToken(rpc, tokenAddr as any);
     return Number(acc?.data?.amount || 0);
   };
 

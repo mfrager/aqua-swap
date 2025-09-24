@@ -37,12 +37,11 @@ mod idl_gen {
     #[derive(shank::ShankInstruction)]
     enum _SwapProgramInstruction {
         #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
-        #[account(1, name = "verify_acc", desc = "Verify account")]
-        #[account(2, writable, name = "swap_acc", desc = "Swap account")]
-        #[account(3, name = "vault_base_acc", desc = "Base vault")]
-        #[account(4, name = "vault_quote_acc", desc = "Quote vault")]
-        #[account(5, name = "system_program")]
-        #[account(6, name = "rent")]
+        #[account(1, writable, name = "swap_acc", desc = "Swap account")]
+        #[account(2, name = "vault_base_acc", desc = "Base vault")]
+        #[account(3, name = "vault_quote_acc", desc = "Quote vault")]
+        #[account(4, name = "system_program")]
+        #[account(5, name = "rent")]
         Create(CreateData),
         #[account(0, writable, signer, name = "user_acc", desc = "User account")]
         #[account(1, name = "swap_acc", desc = "Swap account")]
@@ -57,6 +56,7 @@ mod idl_gen {
         #[account(10, writable, name = "wsol_temp_acc", desc = "WSOL temporary token")]
         #[account(11, name = "token_program")]
         #[account(12, name = "system_program")]
+        #[account(13, name = "ata_program")]
         Swap(SwapData),
         #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
         #[account(1, writable, name = "swap_acc", desc = "Swap account")]

@@ -62,6 +62,9 @@ export type SwapInstruction<
   TAccountSystemProgram extends
     | string
     | AccountMeta<string> = '11111111111111111111111111111111',
+  TAccountAtaProgram extends
+    | string
+    | AccountMeta<string> = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -107,6 +110,9 @@ export type SwapInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
+      TAccountAtaProgram extends string
+        ? ReadonlyAccount<TAccountAtaProgram>
+        : TAccountAtaProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -156,6 +162,7 @@ export type SwapInput<
   TAccountWsolTempAcc extends string = string,
   TAccountTokenProgram extends string = string,
   TAccountSystemProgram extends string = string,
+  TAccountAtaProgram extends string = string,
 > = {
   /** User account */
   userAcc: TransactionSigner<TAccountUserAcc>;
@@ -181,6 +188,7 @@ export type SwapInput<
   wsolTempAcc: Address<TAccountWsolTempAcc>;
   tokenProgram?: Address<TAccountTokenProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
+  ataProgram?: Address<TAccountAtaProgram>;
   swapData: SwapInstructionDataArgs['swapData'];
 };
 
@@ -198,6 +206,7 @@ export function getSwapInstruction<
   TAccountWsolTempAcc extends string,
   TAccountTokenProgram extends string,
   TAccountSystemProgram extends string,
+  TAccountAtaProgram extends string,
   TProgramAddress extends Address = typeof AQUA_SWAP_PROGRAM_ADDRESS,
 >(
   input: SwapInput<
@@ -213,7 +222,8 @@ export function getSwapInstruction<
     TAccountBonusQuoteAcc,
     TAccountWsolTempAcc,
     TAccountTokenProgram,
-    TAccountSystemProgram
+    TAccountSystemProgram,
+    TAccountAtaProgram
   >,
   config?: { programAddress?: TProgramAddress }
 ): SwapInstruction<
@@ -230,7 +240,8 @@ export function getSwapInstruction<
   TAccountBonusQuoteAcc,
   TAccountWsolTempAcc,
   TAccountTokenProgram,
-  TAccountSystemProgram
+  TAccountSystemProgram,
+  TAccountAtaProgram
 > {
   // Program address.
   const programAddress = config?.programAddress ?? AQUA_SWAP_PROGRAM_ADDRESS;
@@ -250,6 +261,7 @@ export function getSwapInstruction<
     wsolTempAcc: { value: input.wsolTempAcc ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    ataProgram: { value: input.ataProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -268,6 +280,10 @@ export function getSwapInstruction<
     accounts.systemProgram.value =
       '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
   }
+  if (!accounts.ataProgram.value) {
+    accounts.ataProgram.value =
+      'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address<'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
@@ -285,6 +301,7 @@ export function getSwapInstruction<
       getAccountMeta(accounts.wsolTempAcc),
       getAccountMeta(accounts.tokenProgram),
       getAccountMeta(accounts.systemProgram),
+      getAccountMeta(accounts.ataProgram),
     ],
     data: getSwapInstructionDataEncoder().encode(
       args as SwapInstructionDataArgs
@@ -304,7 +321,8 @@ export function getSwapInstruction<
     TAccountBonusQuoteAcc,
     TAccountWsolTempAcc,
     TAccountTokenProgram,
-    TAccountSystemProgram
+    TAccountSystemProgram,
+    TAccountAtaProgram
   >);
 }
 
@@ -338,6 +356,7 @@ export type ParsedSwapInstruction<
     wsolTempAcc: TAccountMetas[10];
     tokenProgram: TAccountMetas[11];
     systemProgram: TAccountMetas[12];
+    ataProgram: TAccountMetas[13];
   };
   data: SwapInstructionData;
 };
@@ -350,7 +369,7 @@ export function parseSwapInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedSwapInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 13) {
+  if (instruction.accounts.length < 14) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -376,6 +395,7 @@ export function parseSwapInstruction<
       wsolTempAcc: getNextAccount(),
       tokenProgram: getNextAccount(),
       systemProgram: getNextAccount(),
+      ataProgram: getNextAccount(),
     },
     data: getSwapInstructionDataDecoder().decode(instruction.data),
   };
