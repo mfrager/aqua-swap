@@ -6,6 +6,7 @@ use pinocchio::{
     sysvars::rent::Rent,
     ProgramResult,
 };
+use five8_const;
 use shank::ShankAccount;
 use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
@@ -23,6 +24,8 @@ use crate::{
 pub struct CreateData {
     pub uuid: u128,
     pub price: u64,
+    pub bonus_base: u64,
+    pub bonus_quote: u64,
     pub bump_seed: u8,
 }
 
@@ -31,11 +34,11 @@ impl DataLen for CreateData {
 }
 
 pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    log!("Starting Aqua Swap");
+    log!("Create Swap");
     // log!("Decoding CreateData: len expected {}, len actual {}", CreateData::LEN, data.len());
     let ix_data = unsafe { load_ix_data::<CreateData>(data)? };
     // log!("uuid: {} bump: {} price: {}", ix_data.uuid, ix_data.bump_seed, ix_data.price);
-    let [owner_acc, swap_acc, base_acc, quote_acc, _system_program, rent_acc] = accounts else {
+    let [owner_acc, swap_acc, verify_acc, base_acc, quote_acc, _system_program, rent_acc] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
     if !owner_acc.is_signer() {
@@ -59,6 +62,12 @@ pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     if ix_data.price == 0 {
         return Err(SwapError::InvalidParameters.into());
     }
+    let mut quote_sol: bool = false;
+
+    if *quote_token.mint() == five8_const::decode_32_const("So11111111111111111111111111111111111111112") {
+        quote_sol = true;
+    }
+
     let uuid_binding = ix_data.uuid.to_le_bytes();
     let pda_bump_bytes = [ix_data.bump_seed];
     let signer_seeds = [
@@ -75,7 +84,7 @@ pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         lamports: rent.minimum_balance(SwapState::LEN),
     }
     .invoke_signed(&signers)?;
-    SwapState::create_swap(swap_acc, owner_acc, base_acc, quote_acc, ix_data)?;
-    log!("Created Swap Data Account");
+    SwapState::create_swap(swap_acc, owner_acc, verify_acc, base_acc, quote_acc, ix_data, quote_sol)?;
+    log!("Swap Created");
     Ok(())
 }

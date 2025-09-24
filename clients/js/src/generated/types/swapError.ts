@@ -25,6 +25,7 @@ export enum SwapError {
   WrongVaultBase,
   WrongVaultQuote,
   SameMint,
+  NotOwner,
 }
 
 export type SwapErrorArgs = SwapError;

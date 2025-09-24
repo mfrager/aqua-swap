@@ -23,6 +23,7 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
@@ -55,6 +56,7 @@ export type CreateInstruction<
   TAccountRent extends
     | string
     | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountVerifyAcc extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -79,6 +81,10 @@ export type CreateInstruction<
       TAccountRent extends string
         ? ReadonlyAccount<TAccountRent>
         : TAccountRent,
+      TAccountVerifyAcc extends string
+        ? ReadonlySignerAccount<TAccountVerifyAcc> &
+            AccountSignerMeta<TAccountVerifyAcc>
+        : TAccountVerifyAcc,
       ...TRemainingAccounts,
     ]
   >;
@@ -124,6 +130,7 @@ export type CreateInput<
   TAccountVaultQuoteAcc extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountRent extends string = string,
+  TAccountVerifyAcc extends string = string,
 > = {
   /** Owner account */
   ownerAcc: TransactionSigner<TAccountOwnerAcc>;
@@ -135,6 +142,8 @@ export type CreateInput<
   vaultQuoteAcc: Address<TAccountVaultQuoteAcc>;
   systemProgram?: Address<TAccountSystemProgram>;
   rent?: Address<TAccountRent>;
+  /** Verify account */
+  verifyAcc: TransactionSigner<TAccountVerifyAcc>;
   createData: CreateInstructionDataArgs['createData'];
 };
 
@@ -145,6 +154,7 @@ export function getCreateInstruction<
   TAccountVaultQuoteAcc extends string,
   TAccountSystemProgram extends string,
   TAccountRent extends string,
+  TAccountVerifyAcc extends string,
   TProgramAddress extends Address = typeof AQUA_SWAP_PROGRAM_ADDRESS,
 >(
   input: CreateInput<
@@ -153,7 +163,8 @@ export function getCreateInstruction<
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
     TAccountSystemProgram,
-    TAccountRent
+    TAccountRent,
+    TAccountVerifyAcc
   >,
   config?: { programAddress?: TProgramAddress }
 ): CreateInstruction<
@@ -163,7 +174,8 @@ export function getCreateInstruction<
   TAccountVaultBaseAcc,
   TAccountVaultQuoteAcc,
   TAccountSystemProgram,
-  TAccountRent
+  TAccountRent,
+  TAccountVerifyAcc
 > {
   // Program address.
   const programAddress = config?.programAddress ?? AQUA_SWAP_PROGRAM_ADDRESS;
@@ -176,6 +188,7 @@ export function getCreateInstruction<
     vaultQuoteAcc: { value: input.vaultQuoteAcc ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     rent: { value: input.rent ?? null, isWritable: false },
+    verifyAcc: { value: input.verifyAcc ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -204,6 +217,7 @@ export function getCreateInstruction<
       getAccountMeta(accounts.vaultQuoteAcc),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.rent),
+      getAccountMeta(accounts.verifyAcc),
     ],
     data: getCreateInstructionDataEncoder().encode(
       args as CreateInstructionDataArgs
@@ -216,7 +230,8 @@ export function getCreateInstruction<
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
     TAccountSystemProgram,
-    TAccountRent
+    TAccountRent,
+    TAccountVerifyAcc
   >);
 }
 
@@ -236,6 +251,8 @@ export type ParsedCreateInstruction<
     vaultQuoteAcc: TAccountMetas[3];
     systemProgram: TAccountMetas[4];
     rent: TAccountMetas[5];
+    /** Verify account */
+    verifyAcc: TAccountMetas[6];
   };
   data: CreateInstructionData;
 };
@@ -248,7 +265,7 @@ export function parseCreateInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedCreateInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 7) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -267,6 +284,7 @@ export function parseCreateInstruction<
       vaultQuoteAcc: getNextAccount(),
       systemProgram: getNextAccount(),
       rent: getNextAccount(),
+      verifyAcc: getNextAccount(),
     },
     data: getCreateInstructionDataDecoder().decode(instruction.data),
   };

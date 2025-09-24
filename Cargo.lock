@@ -172,6 +172,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 name = "aqua_swap"
 version = "0.1.0"
 dependencies = [
+ "five8_const 1.0.0",
  "mollusk-svm",
  "mollusk-svm-bencher",
  "pinocchio",
@@ -874,6 +875,15 @@ name = "five8_const"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26dec3da8bc3ef08f2c04f61eab298c3ab334523e55f076354d6d6f613799a7b"
+dependencies = [
+ "five8_core",
+]
+
+[[package]]
+name = "five8_const"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a0f1728185f277989ca573a402716ae0beaaea3f76a8ff87ef9dd8fb19436c5"
 dependencies = [
  "five8_core",
 ]
@@ -1601,7 +1611,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb0225638cadcbebae8932cb7f49cb5da7c15c21beb19f048f05a5ca7d93f065"
 dependencies = [
- "five8_const",
+ "five8_const 0.1.4",
  "pinocchio",
  "sha2-const-stable",
 ]
@@ -2135,7 +2145,7 @@ dependencies = [
  "bytemuck_derive",
  "curve25519-dalek 4.1.3",
  "five8",
- "five8_const",
+ "five8_const 0.1.4",
  "rand 0.8.5",
  "serde",
  "serde_derive",

@@ -11,6 +11,7 @@ pub enum SwapError {
     WrongVaultBase,
     WrongVaultQuote,
     SameMint,
+    NotOwner,
 }
 
 impl From<SwapError> for ProgramError {

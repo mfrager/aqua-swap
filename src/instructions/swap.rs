@@ -30,8 +30,7 @@ impl DataLen for SwapData {
 }
 
 pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    log!("Starting Aqua Swap: swap");
-    log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
+    log!("Begin Swap");
 
     // Accounts as declared in instructions/mod.rs (idl_gen::Swap):
     // 0 user_acc (signer, writable),
@@ -43,7 +42,20 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     // 6 base_mint_acc,
     // 7 quote_mint_acc,
     // 8 token_program
-    let [user_acc, swap_acc, vault_base_acc, vault_quote_acc, user_base_acc, user_quote_acc, base_mint_acc, quote_mint_acc, _token_program] = accounts else {
+    let [
+        user_acc,
+        swap_acc,
+        vault_base_acc,
+        vault_quote_acc,
+        user_base_acc,
+        user_quote_acc,
+        base_mint_acc,
+        quote_mint_acc,
+        _bonus_base_acc,
+        _bonus_quote_acc,
+        _bonus_quote_temp_acc,
+        _token_program,
+    ] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -151,7 +163,8 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     }
     .invoke_signed(&signers)?;
 
-    log!("Swap executed: quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
+    log!("Swap Completed");
+    log!("quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
     Ok(())
 }
 
@@ -230,5 +243,3 @@ fn compute_base_units(
 // - Correctness: The formula is a direct rearrangement of q = p * x, accounting for token
 //   decimals and the fixed 1e9 scaling used for the price.
 // ---
-
-

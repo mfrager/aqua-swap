@@ -1,9 +1,10 @@
 #!/usr/bin/env tsx
 
 /**
- * Minimal Aqua Swap client using @solana/kit and generated clients.
+ * Aqua Swap client using Wrapped SOL (WSOL) as quote token.
  * - Connects to devnet
  * - Loads default keypair from ~/.config/solana/id.json
+ * - Uses WSOL as the quote token instead of creating a custom mint
  * - Sends one create() instruction to the Aqua Swap program
  */
 
@@ -34,6 +35,8 @@ import {
   findAssociatedTokenPda,
   getCreateAssociatedTokenIdempotentInstructionAsync,
   getMintToInstruction,
+  getSyncNativeInstruction,
+  getCloseAccountInstruction,
   TOKEN_PROGRAM_ADDRESS,
   fetchToken
 } from '@solana-program/token';
@@ -45,18 +48,17 @@ import { getSwapInstruction } from './clients/js/src/generated/instructions/swap
 import { getCloseInstruction } from './clients/js/src/generated/instructions/close';
 import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs/aquaSwap';
 
-// Optional: program import (not required since instruction includes programAddress by default)
-// import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs';
+// WSOL mint address (same on all networks)
+const WSOL_MINT_ADDRESS = 'So11111111111111111111111111111111111111112';
 
 const RPC_URL = 'https://api.devnet.solana.com';
 const WS_URL = 'wss://api.devnet.solana.com';
 const DECIMALS = 9;
 const MINT_AMOUNT = 10000; // Increased to cover the swap amount
-const SWAP_QUOTE_AMOUNT = 100; // Amount of quote tokens to mint for swapping
 const FUNDING_AMOUNT = 0.5; // SOL to send to new keypair
 
 async function main() {
-  console.log('🚀 Aqua Swap minimal client start');
+  console.log('🚀 Aqua Swap WSOL client start');
 
   // RPC setup
   const rpc = createSolanaRpc(RPC_URL);
@@ -67,7 +69,6 @@ async function main() {
   // Load payer from ~/.config/solana/id.json and create signer
   const walletPath = process.env.HOME + '/.config/solana/id.json';
   const walletData = JSON.parse(readFileSync(walletPath, 'utf8')) as number[];
-  const keypair = Keypair.fromSecretKey(new Uint8Array(walletData));
   const payer = await createKeyPairSignerFromBytes(new Uint8Array(walletData));
   console.log('📝 Payer:', payer.address);
 
@@ -149,60 +150,11 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
-  // Create QUOTE mint first (no ATA yet) - using working pattern
+  // Use WSOL as quote token (no need to create a custom mint)
   // ------------------------------------------------------------------
-  const quoteMint = await generateKeyPairSigner();
-  const quoteMintAuthority = payer; // Use payer as mint authority
-  console.log('\n🏭 Creating QUOTE mint:', quoteMint.address);
-  
-  try {
-    // Get mint size and rent exemption
-    const quoteMintSpace = BigInt(getMintSize());
-    const quoteMintRent = await rpc.getMinimumBalanceForRentExemption(quoteMintSpace).send();
-    
-    // Create instructions array (following working example pattern)
-    const quoteMintInstructions = [
-      // Create the Mint Account
-      getCreateAccountInstruction({
-        payer,
-        newAccount: quoteMint,
-        lamports: quoteMintRent,
-        space: quoteMintSpace,
-        programAddress: TOKEN_PROGRAM_ADDRESS,
-      }),
-      // Initialize the Mint
-      getInitializeMintInstruction({
-        mint: quoteMint.address,
-        decimals: DECIMALS,
-        mintAuthority: quoteMintAuthority.address
-      }),
-    ];
-
-    // Get recent blockhash
-    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-
-    // Create transaction using pipe pattern (following working example)
-    const createQuoteMintTxid = await pipe(
-      createTransactionMessage({ version: 0 }),
-      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-      (tx) => appendTransactionMessageInstructions(quoteMintInstructions, tx),
-      async (tx) => {
-        const signedTransaction = await signTransactionMessageWithSigners(tx);
-        await sendAndConfirmTransaction(signedTransaction as any, { commitment: 'confirmed' });
-        return getSignatureFromTransaction(signedTransaction);
-      }
-    );
-    
-    console.log('✅ QUOTE mint created:', quoteMint.address);
-    console.log('   Decimals:', DECIMALS);
-    console.log('   Mint Authority:', quoteMintAuthority.address);
-    console.log('   Transaction signature:', createQuoteMintTxid);
-    
-  } catch (error) {
-    console.log('❌ QUOTE mint creation failed:', (error as Error).message);
-    throw error;
-  }
+  console.log('\n🏭 Using WSOL as quote token');
+  console.log('   WSOL mint address:', WSOL_MINT_ADDRESS);
+  console.log('   Decimals: 9 (same as SOL)');
 
   // ------------------------------------------------------------------
   // Create vault accounts and call create instruction in same transaction
@@ -216,14 +168,14 @@ async function main() {
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const [quoteAta] = await findAssociatedTokenPda({
-    mint: quoteMint.address,
+    mint: WSOL_MINT_ADDRESS,
     owner: payer.address, // Quote vault should be owned by payer, not swap PDA
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
 
   console.log('🏦 Vault accounts:');
   console.log('   Base ATA:', baseAta);
-  console.log('   Quote ATA:', quoteAta);
+  console.log('   Quote ATA (WSOL):', quoteAta);
 
   // Create vault accounts, swap account, and mint base tokens in same transaction (following working example pattern)
   console.log('🪙 Creating vault accounts, swap account, and minting base tokens...');
@@ -281,13 +233,13 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
-  // Create quote ATA in separate transaction
+  // Create WSOL ATA in separate transaction
   // ------------------------------------------------------------------
-  console.log('\n📋 Creating quote ATA...');
+  console.log('\n📋 Creating WSOL ATA...');
   const { value: latestBlockhash2 } = await rpc.getLatestBlockhash().send();
   
   const createQuoteAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
-    mint: quoteMint.address,
+    mint: WSOL_MINT_ADDRESS,
     payer,
     owner: payer.address, // Quote vault should be owned by payer
   });
@@ -300,14 +252,14 @@ async function main() {
       (tx) => appendTransactionMessageInstructions([createQuoteAtaIx], tx),
       async (tx) => {
         const signed = await signTransactionMessageWithSigners(tx);
-        console.log('   Quote ATA creation transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
+        console.log('   WSOL ATA creation transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
         await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: false });
         return getSignatureFromTransaction(signed);
       }
     );
-    console.log('✅ Quote ATA created');
+    console.log('✅ WSOL ATA created');
   } catch (error) {
-    console.log('❌ Quote ATA creation failed:', error);
+    console.log('❌ WSOL ATA creation failed:', error);
     throw error;
   }
 
@@ -325,7 +277,7 @@ async function main() {
     verifyAcc: payer, // Use payer as verify account
     createData: {
       uuid,              // u128 from parsed UUID string
-      price: 10_000_000_000n, // 10 quote tokens per 1 base token (scaled by 1e9)
+      price: 10_000n, // 10 quote tokens per 1 base token (scaled by 1e9)
       bonusBase: 0n,     // Set bonus base to 0
       bonusQuote: 0n,    // Set bonus quote to 0
       bumpSeed: Number(bumpSeed) // u8 bump from PDA derivation
@@ -381,7 +333,7 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
-  // Create ATAs for the swap user for both base and quote tokens
+  // Derive ATA addresses for swap user
   // ------------------------------------------------------------------
   const [swapUserBaseAta] = await findAssociatedTokenPda({
     mint: baseMint.address,
@@ -389,15 +341,17 @@ async function main() {
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const [swapUserQuoteAta] = await findAssociatedTokenPda({
-    mint: quoteMint.address,
+    mint: WSOL_MINT_ADDRESS,
     owner: swapUser.address,
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
 
-  console.log('🏦 Creating ATAs for swap user:');
+  console.log('🏦 Swap user ATA addresses:');
   console.log('   Base ATA:', swapUserBaseAta);
-  console.log('   Quote ATA:', swapUserQuoteAta);
+  console.log('   Quote ATA (WSOL):', swapUserQuoteAta);
 
+  // Create base ATA for swap user (WSOL ATA will be created dynamically if needed)
+  console.log('📋 Creating base ATA for swap user...');
   {
     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
     const createBaseAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
@@ -405,58 +359,67 @@ async function main() {
       payer,
       owner: swapUser.address,
     });
-    const createQuoteAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
-      mint: quoteMint.address,
-      payer,
-      owner: swapUser.address,
-    });
     await pipe(
       createTransactionMessage({ version: 0 }),
       (tx) => setTransactionMessageFeePayerSigner(payer, tx),
       (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-      (tx) => appendTransactionMessageInstructions([createBaseAtaIx, createQuoteAtaIx], tx),
+      (tx) => appendTransactionMessageInstructions([createBaseAtaIx], tx),
       async (tx) => {
         const signed = await signTransactionMessageWithSigners(tx);
         await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
         return null as unknown as string;
       }
     );
-    console.log('✅ Swap user ATAs created');
+    console.log('✅ Swap user base ATA created');
   }
 
   // ------------------------------------------------------------------
-  // Mint quote tokens to swap user's ATA
+  // Combined WSOL wrap and swap transaction
   // ------------------------------------------------------------------
-  console.log('🪙 Minting', SWAP_QUOTE_AMOUNT, 'quote tokens to swap user');
-  {
-    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-    const mintQuoteToSwapUserIx = getMintToInstruction({
-      mint: quoteMint.address,
-      token: swapUserQuoteAta,
-      amount: BigInt(SWAP_QUOTE_AMOUNT * 10 ** DECIMALS),
-      mintAuthority: quoteMintAuthority,
-    });
-    await pipe(
-      createTransactionMessage({ version: 0 }),
-      (tx) => setTransactionMessageFeePayerSigner(payer, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-      (tx) => appendTransactionMessageInstructions([mintQuoteToSwapUserIx], tx),
-      async (tx) => {
-        const signed = await signTransactionMessageWithSigners(tx);
-        console.log('   Quote minting transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
-        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: true });
-        return getSignatureFromTransaction(signed);
-      }
-    );
-    console.log('✅ Quote tokens minted to swap user');
-  }
-
-  // ------------------------------------------------------------------
-  // Execute swap: swap user trades quote tokens for base tokens
-  // ------------------------------------------------------------------
-  console.log('\n🔄 Executing swap: swap user trades quote tokens for base tokens');
-  const swapAmount = BigInt(10) * BigInt(10 ** DECIMALS); // 10 quote tokens
+  console.log('\n🔄 Executing combined WSOL wrap and swap transaction');
+  const swapAmount = BigInt(100_000_000); // 0.1 WSOL tokens (100M lamports)
   
+  // Check if WSOL ATA exists to determine if we should close it later
+  let wsolAtaExists = false;
+  try {
+    const wsolAccount = await fetchToken(rpc, swapUserQuoteAta);
+    wsolAtaExists = wsolAccount !== null;
+    console.log('🔍 WSOL ATA exists:', wsolAtaExists);
+  } catch (error) {
+    wsolAtaExists = false;
+    console.log('🔍 WSOL ATA exists: false (account not found)');
+  }
+
+  // Build dynamic transaction instructions
+  const instructions = [];
+  
+  // 1. Create WSOL ATA if it doesn't exist (idempotent)
+  console.log('📋 Adding create WSOL ATA instruction...');
+  const createWsolAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
+    mint: WSOL_MINT_ADDRESS,
+    payer: swapUser,
+    owner: swapUser.address,
+  });
+  instructions.push(createWsolAtaIx);
+  
+  // 2. Transfer SOL to WSOL ATA (this wraps it)
+  console.log('💰 Adding transfer SOL instruction...');
+  const transferSolIx = getTransferSolInstruction({
+    source: swapUser,
+    destination: swapUserQuoteAta,
+    amount: BigInt(0.4 * 1e9), // 0.4 SOL in lamports (leave some for fees)
+  });
+  instructions.push(transferSolIx);
+  
+  // 3. Sync native WSOL balance
+  console.log('🔄 Adding sync native instruction...');
+  const syncNativeIx = getSyncNativeInstruction({
+    account: swapUserQuoteAta,
+  });
+  instructions.push(syncNativeIx);
+  
+  // 4. Execute swap
+  console.log('🔄 Adding swap instruction...');
   const swapIx = getSwapInstruction({
     userAcc: swapUser,
     swapAcc: address(derivedSwapAddress),
@@ -465,30 +428,51 @@ async function main() {
     userBaseAcc: address(swapUserBaseAta),
     userQuoteAcc: address(swapUserQuoteAta),
     baseMintAcc: address(baseMint.address),
-    quoteMintAcc: address(quoteMint.address),
+    quoteMintAcc: address(WSOL_MINT_ADDRESS),
     swapData: {
       quoteIn: swapAmount
     }
   });
+  instructions.push(swapIx);
+  
+  // 5. Close WSOL ATA only if it didn't exist before (clean up)
+  if (!wsolAtaExists) {
+    console.log('🔒 Adding close WSOL ATA instruction (cleanup)...');
+    const closeWsolAtaIx = getCloseAccountInstruction({
+      account: swapUserQuoteAta,
+      destination: swapUser.address,
+      owner: swapUser.address,
+    });
+    instructions.push(closeWsolAtaIx);
+  } else {
+    console.log('💡 Keeping existing WSOL ATA open');
+  }
 
-  {
-    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-    const swapSig = await pipe(
-      createTransactionMessage({ version: 0 }),
-      (tx) => setTransactionMessageFeePayerSigner(swapUser, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-      (tx) => appendTransactionMessageInstructions([swapIx], tx),
-      async (tx) => {
-        const signed = await signTransactionMessageWithSigners(tx);
-        console.log('Transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
-        await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: true });
-        return getSignatureFromTransaction(signed);
-      }
-    );
-  console.log('✅ Swap executed successfully');
-  console.log('   Swap tx signature:', swapSig);
-  console.log('   Swapped:', swapAmount.toString(), 'quote tokens for base tokens');
-  console.log('   💡 Note: Check transaction logs for actual token transfer details');
+  // Execute all instructions in single transaction
+  console.log(`🚀 Executing ${instructions.length} instructions in single transaction...`);
+  const { value: latestBlockhash4 } = await rpc.getLatestBlockhash().send();
+  
+  const transactionSig = await pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(swapUser, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash4, tx),
+    (tx) => appendTransactionMessageInstructions(instructions, tx),
+    async (tx) => {
+      const signed = await signTransactionMessageWithSigners(tx);
+      console.log('   Combined transaction signature:', bs58.encode((signed as any).signatures[Object.keys(signed.signatures)[0]]));
+      await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed', skipPreflight: true });
+      return getSignatureFromTransaction(signed);
+    }
+  );
+  
+  console.log('✅ Combined WSOL wrap + swap transaction executed successfully');
+  console.log('   Transaction signature:', transactionSig);
+  console.log('   Instructions executed:', instructions.length);
+  console.log('   Swapped:', Number(swapAmount) / (10 ** 9), 'WSOL tokens for base tokens');
+  if (!wsolAtaExists) {
+    console.log('   WSOL ATA closed and SOL returned to user');
+  } else {
+    console.log('   WSOL ATA kept open for future use');
   }
 
   // ------------------------------------------------------------------
@@ -497,8 +481,8 @@ async function main() {
   console.log('\n🔍 Verifying swap results...');
 
   // Wait for all transactions to be fully processed
-  console.log('⏳ Waiting 4 seconds for all transactions to be fully processed...');
-  await new Promise(resolve => setTimeout(resolve, 4000)); // Increased wait time
+  console.log('⏳ Waiting 15 seconds for all transactions to be fully processed...');
+  await new Promise(resolve => setTimeout(resolve, 15000)); // Increased wait time
   
   // Calculate expected base tokens received
   // swapAmount is in smallest units (10,000,000,000 = 10 tokens)
@@ -520,7 +504,7 @@ async function main() {
   try {
     console.log('🏦 Checking vault balances...');
     console.log('   Base vault address:', baseAta);
-    console.log('   Quote vault address:', quoteAta);
+    console.log('   Quote vault address (WSOL):', quoteAta);
     
     const baseVaultAccount = await fetchToken(rpc, baseAta);
     const quoteVaultAccount = await fetchToken(rpc, quoteAta);
@@ -539,7 +523,7 @@ async function main() {
     if (quoteVaultAccount) {
       const rawAmount = quoteVaultAccount.data.amount || 0;
       const quoteVaultBalance = Number(rawAmount) / (10 ** DECIMALS);
-      console.log(`   Quote vault balance: ${quoteVaultBalance} quote tokens`);
+      console.log(`   Quote vault balance (WSOL): ${quoteVaultBalance} WSOL tokens`);
       console.log(`   Quote vault raw amount: ${rawAmount}`);
     } else {
       console.log('   Quote vault account not found');
@@ -671,8 +655,8 @@ async function main() {
   // Verify close results
   // ------------------------------------------------------------------
   console.log('\n🔍 Verifying close results...');
-  console.log('⏳ Waiting 4 seconds for close transaction to be fully processed...');
-  await new Promise(resolve => setTimeout(resolve, 4000));
+  console.log('⏳ Waiting 10 seconds for close transaction to be fully processed...');
+  await new Promise(resolve => setTimeout(resolve, 10000));
 
   // Check that vault account is closed (should not exist)
   try {
@@ -700,9 +684,9 @@ async function main() {
     console.log('❌ Error checking payer balance after close:', error);
   }
 
-  console.log('\n🎉 Complete Aqua Swap lifecycle completed successfully!');
-  console.log('   ✅ Created swap account');
-  console.log('   ✅ Executed swap');
+  console.log('\n🎉 Complete Aqua Swap WSOL lifecycle completed successfully!');
+  console.log('   ✅ Created swap account with WSOL as quote token');
+  console.log('   ✅ Executed swap (WSOL → base tokens)');
   console.log('   ✅ Closed swap account');
   console.log('   ✅ Recovered all tokens');
 }
@@ -712,6 +696,4 @@ main().catch((e) => {
   process.exit(1);
 });
 
-export { main as aquaClient };
-
-
+export { main as aquaClientWSOL };

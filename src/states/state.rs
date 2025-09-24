@@ -6,6 +6,7 @@ use pinocchio::{
     pubkey::Pubkey,
     ProgramResult,
 };
+use pinocchio_log::log;
 
 use crate::{errors::SwapError, instructions::CreateData};
 
@@ -13,11 +14,15 @@ use crate::{errors::SwapError, instructions::CreateData};
 #[derive(Clone, Copy, Debug, PartialEq, ShankAccount)]
 pub struct SwapState {
     pub owner: Pubkey,
+    pub verify: Pubkey,
     pub base: Pubkey,
     pub quote: Pubkey,
     pub uuid: u128,
     pub price: u64,
+    pub bonus_base: u64,
+    pub bonus_quote: u64,
     pub bump_seed: u8,
+    pub quote_sol: bool,
 }
 
 impl DataLen for SwapState {
@@ -36,17 +41,30 @@ impl SwapState {
     pub fn create_swap(
         swap_acc: &AccountInfo,
         owner_acc: &AccountInfo,
+        verify_acc: &AccountInfo,
         base_acc: &AccountInfo,
         quote_acc: &AccountInfo,
         create_data: &CreateData,
+        quote_sol: bool,
     ) -> ProgramResult {
         let swap_data = unsafe { load_acc_mut_unchecked::<SwapState>(swap_acc.borrow_mut_data_unchecked()) }?;
         swap_data.price = create_data.price;
+        swap_data.bonus_base = create_data.bonus_base;
+        swap_data.bonus_quote = create_data.bonus_quote;
         swap_data.uuid = create_data.uuid;
         swap_data.bump_seed = create_data.bump_seed;
         swap_data.owner = *owner_acc.key();
+        swap_data.verify = *verify_acc.key();
         swap_data.base = *base_acc.key();
         swap_data.quote = *quote_acc.key();
+        swap_data.quote_sol = quote_sol;
+
+        log!("SwapState uuid: {}", swap_data.uuid);
+        log!("SwapState quote_sol: {}", swap_data.quote_sol);
+        log!("SwapState price: {}", swap_data.price / 1_000_000_000);
+        log!("SwapState bonus_base: {}", swap_data.bonus_base);
+        log!("SwapState bonus_quote: {}", swap_data.bonus_quote);
+
         Ok(())
     }
 }

@@ -15,6 +15,8 @@ import {
   fetchEncodedAccounts,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getStructDecoder,
   getStructEncoder,
   getU128Decoder,
@@ -37,41 +39,57 @@ import {
 
 export type SwapState = {
   owner: Address;
+  verify: Address;
   base: Address;
   quote: Address;
   uuid: bigint;
   price: bigint;
+  bonusBase: bigint;
+  bonusQuote: bigint;
   bumpSeed: number;
+  quoteSol: boolean;
 };
 
 export type SwapStateArgs = {
   owner: Address;
+  verify: Address;
   base: Address;
   quote: Address;
   uuid: number | bigint;
   price: number | bigint;
+  bonusBase: number | bigint;
+  bonusQuote: number | bigint;
   bumpSeed: number;
+  quoteSol: boolean;
 };
 
 export function getSwapStateEncoder(): FixedSizeEncoder<SwapStateArgs> {
   return getStructEncoder([
     ['owner', getAddressEncoder()],
+    ['verify', getAddressEncoder()],
     ['base', getAddressEncoder()],
     ['quote', getAddressEncoder()],
     ['uuid', getU128Encoder()],
     ['price', getU64Encoder()],
+    ['bonusBase', getU64Encoder()],
+    ['bonusQuote', getU64Encoder()],
     ['bumpSeed', getU8Encoder()],
+    ['quoteSol', getBooleanEncoder()],
   ]);
 }
 
 export function getSwapStateDecoder(): FixedSizeDecoder<SwapState> {
   return getStructDecoder([
     ['owner', getAddressDecoder()],
+    ['verify', getAddressDecoder()],
     ['base', getAddressDecoder()],
     ['quote', getAddressDecoder()],
     ['uuid', getU128Decoder()],
     ['price', getU64Decoder()],
+    ['bonusBase', getU64Decoder()],
+    ['bonusQuote', getU64Decoder()],
     ['bumpSeed', getU8Decoder()],
+    ['quoteSol', getBooleanDecoder()],
   ]);
 }
 
@@ -133,5 +151,5 @@ export async function fetchAllMaybeSwapState(
 }
 
 export function getSwapStateSize(): number {
-  return 121;
+  return 170;
 }

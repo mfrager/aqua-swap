@@ -46,6 +46,14 @@
           "name": "rent",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "verifyAcc",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Verify account"
+          ]
         }
       ],
       "args": [
@@ -210,6 +218,14 @@
             "type": "u64"
           },
           {
+            "name": "bonusBase",
+            "type": "u64"
+          },
+          {
+            "name": "bonusQuote",
+            "type": "u64"
+          },
+          {
             "name": "bumpSeed",
             "type": "u8"
           }
@@ -238,6 +254,10 @@
             "type": "publicKey"
           },
           {
+            "name": "verify",
+            "type": "publicKey"
+          },
+          {
             "name": "base",
             "type": "publicKey"
           },
@@ -254,8 +274,20 @@
             "type": "u64"
           },
           {
+            "name": "bonusBase",
+            "type": "u64"
+          },
+          {
+            "name": "bonusQuote",
+            "type": "u64"
+          },
+          {
             "name": "bumpSeed",
             "type": "u8"
+          },
+          {
+            "name": "quoteSol",
+            "type": "bool"
           }
         ]
       }
@@ -293,6 +325,9 @@
           },
           {
             "name": "SameMint"
+          },
+          {
+            "name": "NotOwner"
           }
         ]
       }

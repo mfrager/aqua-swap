@@ -18,8 +18,7 @@ use crate::{
 };
 
 pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
-    log!("Starting Aqua Swap Close");
-    
+    log!("Close Swap");
     let [owner_acc, swap_acc, vault_base_acc, owner_base_acc, _token_program] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -34,7 +33,7 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
     
     // Validate owner matches
     if swap_state.owner != *owner_acc.key() {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::NotOwner.into());
     }
 
     // Validate vault base account matches
@@ -51,7 +50,6 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
     // Load owner base token account and extract needed values
     let owner_base_token = TokenAccount::from_account_info(owner_base_acc)?;
     let owner_mint = *owner_base_token.mint();
-    let owner_owner = *owner_base_token.owner();
     
     // Drop the token account structs to release borrows
     drop(vault_base_token);
@@ -66,13 +64,9 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
         return Err(SwapError::WrongOwnerBase.into());
     }
 
-    if owner_owner != *owner_acc.key() {
-        return Err(SwapError::InvalidParameters.into());
-    }
-
     // If there are tokens to transfer, do the transfer
     if transfer_amount > 0 {
-        log!("Transferring {} base tokens back to owner", transfer_amount);
+        // log!("Transferring {} base tokens back to owner", transfer_amount);
         
         // Create PDA seeds for signing
         let uuid_binding = swap_state.uuid.to_le_bytes();
@@ -91,14 +85,7 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
             amount: transfer_amount,
         }
         .invoke_signed(&signers)?;
-        
-        log!("Transfer completed successfully");
-    } else {
-        log!("No tokens to transfer, vault is empty");
     }
-
-    // Close the base vault token account
-    log!("Closing base vault token account");
     
     // Create PDA seeds for signing the close operation
     let uuid_binding = swap_state.uuid.to_le_bytes();
@@ -116,11 +103,6 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
         authority: swap_acc,
     }
     .invoke_signed(&signers)?;
-
-    log!("Base vault token account closed");
-
-    // Close the swap account itself
-    log!("Closing swap account");
     
     // Transfer remaining lamports from swap account to owner
     let swap_lamports = unsafe { *swap_acc.borrow_lamports_unchecked() };
@@ -137,6 +119,6 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
         data.fill(0);
     }
 
-    log!("Swap account closed successfully");
+    log!("Swap Closed");
     Ok(())
 }

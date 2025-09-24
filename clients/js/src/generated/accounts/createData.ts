@@ -33,11 +33,19 @@ import {
   type MaybeEncodedAccount,
 } from '@solana/kit';
 
-export type CreateData = { uuid: bigint; price: bigint; bumpSeed: number };
+export type CreateData = {
+  uuid: bigint;
+  price: bigint;
+  bonusBase: bigint;
+  bonusQuote: bigint;
+  bumpSeed: number;
+};
 
 export type CreateDataArgs = {
   uuid: number | bigint;
   price: number | bigint;
+  bonusBase: number | bigint;
+  bonusQuote: number | bigint;
   bumpSeed: number;
 };
 
@@ -45,6 +53,8 @@ export function getCreateDataEncoder(): FixedSizeEncoder<CreateDataArgs> {
   return getStructEncoder([
     ['uuid', getU128Encoder()],
     ['price', getU64Encoder()],
+    ['bonusBase', getU64Encoder()],
+    ['bonusQuote', getU64Encoder()],
     ['bumpSeed', getU8Encoder()],
   ]);
 }
@@ -53,6 +63,8 @@ export function getCreateDataDecoder(): FixedSizeDecoder<CreateData> {
   return getStructDecoder([
     ['uuid', getU128Decoder()],
     ['price', getU64Decoder()],
+    ['bonusBase', getU64Decoder()],
+    ['bonusQuote', getU64Decoder()],
     ['bumpSeed', getU8Decoder()],
   ]);
 }
@@ -118,5 +130,5 @@ export async function fetchAllMaybeCreateData(
 }
 
 export function getCreateDataSize(): number {
-  return 25;
+  return 41;
 }
