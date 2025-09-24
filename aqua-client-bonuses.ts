@@ -218,16 +218,18 @@ async function main() {
   }
   console.log('✅ Swap user ATAs created');
 
-  // Create quote bonus recipient ATA
+  // Create bonus recipient ATAs (quote and base)
   const [bonusQuoteAta] = await findAssociatedTokenPda({ mint: quoteMint.address, owner: bonusRecipient.address, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  const [bonusBaseAta] = await findAssociatedTokenPda({ mint: baseMint.address, owner: bonusRecipient.address, tokenProgram: TOKEN_PROGRAM_ADDRESS });
   {
     const { value: bh } = await rpc.getLatestBlockhash().send();
-    const ix = await getCreateAssociatedTokenIdempotentInstructionAsync({ mint: quoteMint.address, payer, owner: bonusRecipient.address });
+    const ixQuote = await getCreateAssociatedTokenIdempotentInstructionAsync({ mint: quoteMint.address, payer, owner: bonusRecipient.address });
+    const ixBase = await getCreateAssociatedTokenIdempotentInstructionAsync({ mint: baseMint.address, payer, owner: bonusRecipient.address });
     await pipe(
       createTransactionMessage({ version: 0 }),
       (tx) => setTransactionMessageFeePayerSigner(payer, tx),
       (tx) => setTransactionMessageLifetimeUsingBlockhash(bh, tx),
-      (tx) => appendTransactionMessageInstructions([ix], tx),
+      (tx) => appendTransactionMessageInstructions([ixQuote, ixBase], tx),
       async (tx) => {
         const signed = await signTransactionMessageWithSigners(tx);
         await sendAndConfirmTransaction(signed as any, { commitment: 'confirmed' });
@@ -235,7 +237,7 @@ async function main() {
       }
     );
   }
-  console.log('✅ Bonus recipient quote ATA created');
+  console.log('✅ Bonus recipient ATAs created (quote and base)');
 
   // Mint quote to swap user
   {
@@ -273,6 +275,7 @@ async function main() {
     userBase: await getAmount(swapUserBaseAta),
     userQuote: await getAmount(swapUserQuoteAta),
     bonusQuote: await getAmount(bonusQuoteAta),
+    bonusBase: await getAmount(bonusBaseAta),
   };
 
   // Execute swap (note: pass bonus_base_acc = base vault; bonus_quote_acc = bonus recipient)
@@ -288,7 +291,7 @@ async function main() {
       userQuoteAcc: address(swapUserQuoteAta),
       baseMintAcc: address(baseMint.address),
       quoteMintAcc: address(quoteMint.address),
-      bonusBaseAcc: address(baseVaultAta),
+      bonusBaseAcc: address(bonusBaseAta),
       bonusQuoteAcc: address(bonusQuoteAta),
       wsolTempAcc: address(swapUserQuoteAta), // unused for SPL path
       swapData: { quoteIn: swapAmountUnits },
@@ -314,6 +317,7 @@ async function main() {
     userBase: await getAmount(swapUserBaseAta),
     userQuote: await getAmount(swapUserQuoteAta),
     bonusQuote: await getAmount(bonusQuoteAta),
+    bonusBase: await getAmount(bonusBaseAta),
   };
 
   // Compute expected amounts (mirrors on-chain math)
@@ -336,14 +340,15 @@ async function main() {
   console.log('  Quote to vault (expected):', n(quoteToVault), 'Δ', after.quoteVault - before.quoteVault);
   console.log('  Quote bonus to recipient (expected):', n(quoteBonus), 'Δ', after.bonusQuote - before.bonusQuote);
   console.log('  Base out (expected to user):', n(baseOut), 'Δ', after.userBase - before.userBase);
-  console.log('  Base bonus (expected to user):', n(baseBonus));
+  console.log('  Base bonus to recipient (expected):', n(baseBonus), 'Δ', after.bonusBase - before.bonusBase);
   console.log('  Base vault decrease (approx expected):', n(baseOut + baseBonus), 'Δ', before.baseVault - after.baseVault);
 
   // Simple assertions
   const approxEq = (a: number, b: number) => a === b; // all integer math
   const pass = approxEq(after.quoteVault - before.quoteVault, n(quoteToVault)) &&
                approxEq(after.bonusQuote - before.bonusQuote, n(quoteBonus)) &&
-               approxEq(after.userBase - before.userBase, n(baseOut + baseBonus));
+               approxEq(after.userBase - before.userBase, n(baseOut)) &&
+               approxEq(after.bonusBase - before.bonusBase, n(baseBonus));
 
   if (pass) {
     console.log('\n✅ Bonus verification PASSED');
