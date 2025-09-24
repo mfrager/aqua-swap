@@ -23,7 +23,6 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
@@ -47,6 +46,7 @@ export function getCreateDiscriminatorBytes() {
 export type CreateInstruction<
   TProgram extends string = typeof AQUA_SWAP_PROGRAM_ADDRESS,
   TAccountOwnerAcc extends string | AccountMeta<string> = string,
+  TAccountVerifyAcc extends string | AccountMeta<string> = string,
   TAccountSwapAcc extends string | AccountMeta<string> = string,
   TAccountVaultBaseAcc extends string | AccountMeta<string> = string,
   TAccountVaultQuoteAcc extends string | AccountMeta<string> = string,
@@ -56,7 +56,6 @@ export type CreateInstruction<
   TAccountRent extends
     | string
     | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
-  TAccountVerifyAcc extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -66,6 +65,9 @@ export type CreateInstruction<
         ? WritableSignerAccount<TAccountOwnerAcc> &
             AccountSignerMeta<TAccountOwnerAcc>
         : TAccountOwnerAcc,
+      TAccountVerifyAcc extends string
+        ? ReadonlyAccount<TAccountVerifyAcc>
+        : TAccountVerifyAcc,
       TAccountSwapAcc extends string
         ? WritableAccount<TAccountSwapAcc>
         : TAccountSwapAcc,
@@ -81,10 +83,6 @@ export type CreateInstruction<
       TAccountRent extends string
         ? ReadonlyAccount<TAccountRent>
         : TAccountRent,
-      TAccountVerifyAcc extends string
-        ? ReadonlySignerAccount<TAccountVerifyAcc> &
-            AccountSignerMeta<TAccountVerifyAcc>
-        : TAccountVerifyAcc,
       ...TRemainingAccounts,
     ]
   >;
@@ -125,15 +123,17 @@ export function getCreateInstructionDataCodec(): Codec<
 
 export type CreateInput<
   TAccountOwnerAcc extends string = string,
+  TAccountVerifyAcc extends string = string,
   TAccountSwapAcc extends string = string,
   TAccountVaultBaseAcc extends string = string,
   TAccountVaultQuoteAcc extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountRent extends string = string,
-  TAccountVerifyAcc extends string = string,
 > = {
   /** Owner account */
   ownerAcc: TransactionSigner<TAccountOwnerAcc>;
+  /** Verify account */
+  verifyAcc: Address<TAccountVerifyAcc>;
   /** Swap account */
   swapAcc: Address<TAccountSwapAcc>;
   /** Base vault */
@@ -142,40 +142,38 @@ export type CreateInput<
   vaultQuoteAcc: Address<TAccountVaultQuoteAcc>;
   systemProgram?: Address<TAccountSystemProgram>;
   rent?: Address<TAccountRent>;
-  /** Verify account */
-  verifyAcc: TransactionSigner<TAccountVerifyAcc>;
   createData: CreateInstructionDataArgs['createData'];
 };
 
 export function getCreateInstruction<
   TAccountOwnerAcc extends string,
+  TAccountVerifyAcc extends string,
   TAccountSwapAcc extends string,
   TAccountVaultBaseAcc extends string,
   TAccountVaultQuoteAcc extends string,
   TAccountSystemProgram extends string,
   TAccountRent extends string,
-  TAccountVerifyAcc extends string,
   TProgramAddress extends Address = typeof AQUA_SWAP_PROGRAM_ADDRESS,
 >(
   input: CreateInput<
     TAccountOwnerAcc,
+    TAccountVerifyAcc,
     TAccountSwapAcc,
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
     TAccountSystemProgram,
-    TAccountRent,
-    TAccountVerifyAcc
+    TAccountRent
   >,
   config?: { programAddress?: TProgramAddress }
 ): CreateInstruction<
   TProgramAddress,
   TAccountOwnerAcc,
+  TAccountVerifyAcc,
   TAccountSwapAcc,
   TAccountVaultBaseAcc,
   TAccountVaultQuoteAcc,
   TAccountSystemProgram,
-  TAccountRent,
-  TAccountVerifyAcc
+  TAccountRent
 > {
   // Program address.
   const programAddress = config?.programAddress ?? AQUA_SWAP_PROGRAM_ADDRESS;
@@ -183,12 +181,12 @@ export function getCreateInstruction<
   // Original accounts.
   const originalAccounts = {
     ownerAcc: { value: input.ownerAcc ?? null, isWritable: true },
+    verifyAcc: { value: input.verifyAcc ?? null, isWritable: false },
     swapAcc: { value: input.swapAcc ?? null, isWritable: true },
     vaultBaseAcc: { value: input.vaultBaseAcc ?? null, isWritable: false },
     vaultQuoteAcc: { value: input.vaultQuoteAcc ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     rent: { value: input.rent ?? null, isWritable: false },
-    verifyAcc: { value: input.verifyAcc ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -212,12 +210,12 @@ export function getCreateInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.ownerAcc),
+      getAccountMeta(accounts.verifyAcc),
       getAccountMeta(accounts.swapAcc),
       getAccountMeta(accounts.vaultBaseAcc),
       getAccountMeta(accounts.vaultQuoteAcc),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.rent),
-      getAccountMeta(accounts.verifyAcc),
     ],
     data: getCreateInstructionDataEncoder().encode(
       args as CreateInstructionDataArgs
@@ -226,12 +224,12 @@ export function getCreateInstruction<
   } as CreateInstruction<
     TProgramAddress,
     TAccountOwnerAcc,
+    TAccountVerifyAcc,
     TAccountSwapAcc,
     TAccountVaultBaseAcc,
     TAccountVaultQuoteAcc,
     TAccountSystemProgram,
-    TAccountRent,
-    TAccountVerifyAcc
+    TAccountRent
   >);
 }
 
@@ -243,16 +241,16 @@ export type ParsedCreateInstruction<
   accounts: {
     /** Owner account */
     ownerAcc: TAccountMetas[0];
-    /** Swap account */
-    swapAcc: TAccountMetas[1];
-    /** Base vault */
-    vaultBaseAcc: TAccountMetas[2];
-    /** Quote vault */
-    vaultQuoteAcc: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
-    rent: TAccountMetas[5];
     /** Verify account */
-    verifyAcc: TAccountMetas[6];
+    verifyAcc: TAccountMetas[1];
+    /** Swap account */
+    swapAcc: TAccountMetas[2];
+    /** Base vault */
+    vaultBaseAcc: TAccountMetas[3];
+    /** Quote vault */
+    vaultQuoteAcc: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
+    rent: TAccountMetas[6];
   };
   data: CreateInstructionData;
 };
@@ -279,12 +277,12 @@ export function parseCreateInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       ownerAcc: getNextAccount(),
+      verifyAcc: getNextAccount(),
       swapAcc: getNextAccount(),
       vaultBaseAcc: getNextAccount(),
       vaultQuoteAcc: getNextAccount(),
       systemProgram: getNextAccount(),
       rent: getNextAccount(),
-      verifyAcc: getNextAccount(),
     },
     data: getCreateInstructionDataDecoder().decode(instruction.data),
   };

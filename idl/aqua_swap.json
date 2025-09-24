@@ -14,6 +14,14 @@
           ]
         },
         {
+          "name": "verifyAcc",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Verify account"
+          ]
+        },
+        {
           "name": "swapAcc",
           "isMut": true,
           "isSigner": false,
@@ -46,14 +54,6 @@
           "name": "rent",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "verifyAcc",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Verify account"
-          ]
         }
       ],
       "args": [
@@ -137,7 +137,36 @@
           ]
         },
         {
+          "name": "bonusBaseAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Bonus base token"
+          ]
+        },
+        {
+          "name": "bonusQuoteAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Bonus quote token or account"
+          ]
+        },
+        {
+          "name": "wsolTempAcc",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "WSOL temporary token"
+          ]
+        },
+        {
           "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -228,6 +257,10 @@
           {
             "name": "bumpSeed",
             "type": "u8"
+          },
+          {
+            "name": "requireVerify",
+            "type": "bool"
           }
         ]
       }
@@ -287,6 +320,10 @@
           },
           {
             "name": "quoteSol",
+            "type": "bool"
+          },
+          {
+            "name": "requireVerify",
             "type": "bool"
           }
         ]

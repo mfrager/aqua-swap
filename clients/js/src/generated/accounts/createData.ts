@@ -13,6 +13,8 @@ import {
   decodeAccount,
   fetchEncodedAccount,
   fetchEncodedAccounts,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getStructDecoder,
   getStructEncoder,
   getU128Decoder,
@@ -39,6 +41,7 @@ export type CreateData = {
   bonusBase: bigint;
   bonusQuote: bigint;
   bumpSeed: number;
+  requireVerify: boolean;
 };
 
 export type CreateDataArgs = {
@@ -47,6 +50,7 @@ export type CreateDataArgs = {
   bonusBase: number | bigint;
   bonusQuote: number | bigint;
   bumpSeed: number;
+  requireVerify: boolean;
 };
 
 export function getCreateDataEncoder(): FixedSizeEncoder<CreateDataArgs> {
@@ -56,6 +60,7 @@ export function getCreateDataEncoder(): FixedSizeEncoder<CreateDataArgs> {
     ['bonusBase', getU64Encoder()],
     ['bonusQuote', getU64Encoder()],
     ['bumpSeed', getU8Encoder()],
+    ['requireVerify', getBooleanEncoder()],
   ]);
 }
 
@@ -66,6 +71,7 @@ export function getCreateDataDecoder(): FixedSizeDecoder<CreateData> {
     ['bonusBase', getU64Decoder()],
     ['bonusQuote', getU64Decoder()],
     ['bumpSeed', getU8Decoder()],
+    ['requireVerify', getBooleanDecoder()],
   ]);
 }
 
@@ -130,5 +136,5 @@ export async function fetchAllMaybeCreateData(
 }
 
 export function getCreateDataSize(): number {
-  return 41;
+  return 42;
 }

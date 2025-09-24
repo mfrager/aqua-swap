@@ -50,7 +50,6 @@ const RPC_URL = 'https://api.devnet.solana.com';
 const WS_URL = 'wss://api.devnet.solana.com';
 const DECIMALS = 9;
 const FUNDING_AMOUNT = 0.5; // SOL to send to new keypair
-const SWAP_QUOTE_AMOUNT = 100; // Amount of quote tokens to mint for swapping
 
 // Configuration interface for the swap subroutine
 interface SwapConfig {
@@ -243,10 +242,14 @@ async function createAquaSwap(config: SwapConfig): Promise<SwapResult> {
       swapAcc: address(derivedSwapAddress),
       vaultBaseAcc: address(baseAta),
       vaultQuoteAcc: address(quoteAta),
+      verifyAcc: payer,
       createData: {
         uuid,
         price: BigInt(config.price), // Use the config price
-        bumpSeed: Number(bumpSeed)
+        bonusBase: 0n,
+        bonusQuote: 0n,
+        bumpSeed: Number(bumpSeed),
+        requireVerify: false
       }
     });
 

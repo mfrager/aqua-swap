@@ -145,8 +145,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
             log!("Bonus quote SPL: {}", swap_state.bonus_quote);
             // base_out_vault = base_out + swap_state.bonus_quote;
         }
-        quote_in_bonus = swap_state.bonus_quote;
-        // let quote_ata_bonus = TokenAccount::from_account_info(bonus_quote_acc)?;
+        quote_in_bonus = calculate_quote_bonus(swap_state.bonus_quote, swap_data.quote_in)?;
     }
 
     let quote_in_vault: u64 = swap_data.quote_in.checked_sub(quote_in_bonus).ok_or(SwapError::InvalidParameters)?;
@@ -348,6 +347,47 @@ fn calculate_base_bonus(
         return Err(SwapError::InvalidParameters.into());
     }
     
+    Ok(bonus_amount as u64)
+}
+
+
+/// Calculate quote token bonus based on percentage
+/// 
+/// # Arguments
+/// * `bonus_percentage` - Bonus percentage scaled by 1e9 (100 billion = 100%)
+/// * `quote_in` - Quote tokens the user is paying
+/// 
+/// # Returns
+/// * `Result<u64, ProgramError>` - Bonus amount in quote token smallest units
+/// 
+/// # Formula
+/// bonus_amount = (quote_in * bonus_percentage) / 100_000_000_000
+#[inline(always)]
+fn calculate_quote_bonus(
+    bonus_percentage: u64,
+    quote_in: u64,
+) -> Result<u64, ProgramError> {
+    if bonus_percentage == 0 {
+        return Ok(0);
+    }
+
+    let quote_in_128 = quote_in as u128;
+    let bonus_percentage_128 = bonus_percentage as u128;
+
+    let numerator = quote_in_128
+        .checked_mul(bonus_percentage_128)
+        .ok_or(SwapError::InvalidParameters)?;
+
+    let denominator = 100_000_000_000u128; // 100 * 1e9
+
+    let bonus_amount = numerator
+        .checked_div(denominator)
+        .ok_or(SwapError::InvalidParameters)?;
+
+    if bonus_amount > (u64::MAX as u128) {
+        return Err(SwapError::InvalidParameters.into());
+    }
+
     Ok(bonus_amount as u64)
 }
 

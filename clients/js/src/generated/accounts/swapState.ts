@@ -48,6 +48,7 @@ export type SwapState = {
   bonusQuote: bigint;
   bumpSeed: number;
   quoteSol: boolean;
+  requireVerify: boolean;
 };
 
 export type SwapStateArgs = {
@@ -61,6 +62,7 @@ export type SwapStateArgs = {
   bonusQuote: number | bigint;
   bumpSeed: number;
   quoteSol: boolean;
+  requireVerify: boolean;
 };
 
 export function getSwapStateEncoder(): FixedSizeEncoder<SwapStateArgs> {
@@ -75,6 +77,7 @@ export function getSwapStateEncoder(): FixedSizeEncoder<SwapStateArgs> {
     ['bonusQuote', getU64Encoder()],
     ['bumpSeed', getU8Encoder()],
     ['quoteSol', getBooleanEncoder()],
+    ['requireVerify', getBooleanEncoder()],
   ]);
 }
 
@@ -90,6 +93,7 @@ export function getSwapStateDecoder(): FixedSizeDecoder<SwapState> {
     ['bonusQuote', getU64Decoder()],
     ['bumpSeed', getU8Decoder()],
     ['quoteSol', getBooleanDecoder()],
+    ['requireVerify', getBooleanDecoder()],
   ]);
 }
 
@@ -151,5 +155,5 @@ export async function fetchAllMaybeSwapState(
 }
 
 export function getSwapStateSize(): number {
-  return 170;
+  return 171;
 }
