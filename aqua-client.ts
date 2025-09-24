@@ -40,10 +40,12 @@ import {
 import { getCreateAccountInstruction, getTransferSolInstruction } from '@solana-program/system';
 
 // Generated client imports
-import { getCreateInstruction } from './clients/js/src/generated/instructions/create';
-import { getSwapInstruction } from './clients/js/src/generated/instructions/swap';
-import { getCloseInstruction } from './clients/js/src/generated/instructions/close';
-import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs/aquaSwap';
+import {
+  getCreateInstruction,
+  getSwapInstruction,
+  getCloseInstruction,
+  AQUA_SWAP_PROGRAM_ADDRESS
+} from './clients/js/src/generated'
 
 // Optional: program import (not required since instruction includes programAddress by default)
 // import { AQUA_SWAP_PROGRAM_ADDRESS } from './clients/js/src/generated/programs';
@@ -264,12 +266,12 @@ async function main() {
 
   // Verify the base vault balance immediately after minting (like working example)
   console.log('🔍 Verifying base vault balance after minting...');
-  console.log('⏳ Waiting 10 seconds for transaction to be fully processed...');
-  await new Promise(resolve => setTimeout(resolve, 10000));
+  console.log('⏳ Waiting 4 seconds for transaction to be fully processed...');
+  await new Promise(resolve => setTimeout(resolve, 4000));
   try {
     const baseVaultAccount = await fetchToken(rpc, baseAta);
     if (baseVaultAccount) {
-      const rawAmount = baseVaultAccount.account?.amount || 0;
+      const rawAmount = baseVaultAccount.data.amount || 0;
       const balanceInTokens = Number(rawAmount) / (10 ** DECIMALS);
       console.log('   Base vault balance verification:', balanceInTokens, 'tokens');
       console.log('   Base vault raw amount:', rawAmount);
@@ -322,14 +324,15 @@ async function main() {
     swapAcc: address(derivedSwapAddress),
     vaultBaseAcc: address(baseAta),
     vaultQuoteAcc: address(quoteAta),
-    verifyAcc: payer, // Use payer as verify account
+    verifyAcc: payer.address,
     createData: {
       uuid,              // u128 from parsed UUID string
-      price: 10_000_000_000n, // 10 quote tokens per 1 base token (scaled by 1e9)
-      bonusBase: 0n,     // Set bonus base to 0
-      bonusQuote: 0n,    // Set bonus quote to 0
+      price: 10_000_000_000, // 10 quote tokens per 1 base token (scaled by 1e9)
+      bonusBase: 0,     // Set bonus base to 0
+      bonusQuote: 0,    // Set bonus quote to 0
+      requireVerify: false,
       bumpSeed: Number(bumpSeed) // u8 bump from PDA derivation
-    }
+    },
   });
 
   try {
@@ -466,6 +469,9 @@ async function main() {
     userQuoteAcc: address(swapUserQuoteAta),
     baseMintAcc: address(baseMint.address),
     quoteMintAcc: address(quoteMint.address),
+    bonusBaseAcc: address(swapUserBaseAta),
+    bonusQuoteAcc: address(swapUserQuoteAta),
+    wsolTempAcc: address(swapUserQuoteAta),
     swapData: {
       quoteIn: swapAmount
     }

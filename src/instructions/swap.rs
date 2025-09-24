@@ -57,7 +57,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
+    // log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
     if data.len() != SwapData::LEN {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -68,7 +68,6 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Load swap state
     let swap_state = unsafe { load_acc_unchecked::<SwapState>(swap_acc.borrow_data_unchecked()) }?;
-    log!("Begin swap");
 
     // Decode all accounts once and extract needed values
     let vault_base = TokenAccount::from_account_info(vault_base_acc)?;
@@ -138,14 +137,8 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let mut quote_in_bonus = 0;
     // SPL token or WSOL/SOL
     if swap_state.bonus_quote != 0 && *bonus_quote_acc.key() != *user_quote_acc.key() {
-        if swap_state.quote_sol {
-            log!("Bonus quote WSOL: {}", swap_state.bonus_quote);
-            // base_out_vault = base_out + swap_state.bonus_quote;
-        } else {
-            log!("Bonus quote SPL: {}", swap_state.bonus_quote);
-            // base_out_vault = base_out + swap_state.bonus_quote;
-        }
         quote_in_bonus = calculate_quote_bonus(swap_state.bonus_quote, swap_data.quote_in)?;
+        log!("Quote bonus: {}", quote_in_bonus);
     }
 
     let quote_in_vault: u64 = swap_data.quote_in.checked_sub(quote_in_bonus).ok_or(SwapError::InvalidParameters)?;
@@ -198,6 +191,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         }
         .invoke()?;
     } else {
+        log!("Transfer quote token from user to vault: {}", quote_in_vault);
         TransferChecked {
             from: user_quote_acc,
             mint: quote_mint_acc,
@@ -252,7 +246,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
             .invoke()?;
         } else {
             //let _quote_ata_bonus = TokenAccount::from_account_info(bonus_quote_acc)?;
-            // TODO: validate bonus_quote_acc
+            log!("Transfer quote from user to bonus: {}", quote_in_bonus);
             TransferChecked {
                 from: user_quote_acc,
                 mint: quote_mint_acc,
@@ -267,12 +261,13 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Base tokens
 
+    log!("Transfer base from vault to user: {}", base_out);
     TransferChecked {
         from: vault_base_acc,
         mint: base_mint_acc,
         to: user_base_acc,
         authority: swap_acc,
-        amount: base_out as u64,
+        amount: base_out,
         decimals: base_decimals,
     }
     .invoke_signed(&signers)?;
@@ -283,21 +278,25 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         if *base_ata_bonus.mint() != *base_mint_acc.key() {
             return Err(SwapError::WrongMintBase.into());
         }
-        let bonus_amount = calculate_base_bonus(swap_state.bonus_base as u128, base_out)?;
-        log!("Bonus base: {}", bonus_amount);
+        let bonus_base_amount = calculate_base_bonus(swap_state.bonus_base as u128, base_out)?;
+        log!("Bonus base: {}", bonus_base_amount);
+        // Drop the immutable borrow on bonus_base_acc before doing a transfer that
+        // will require a (mutable) borrow of the same account.
+        drop(base_ata_bonus);
+        log!("Transfer base from vault to bonus: {}", bonus_base_amount);
         TransferChecked {
-            from: bonus_base_acc,
+            from: vault_base_acc,
             mint: base_mint_acc,
-            to: user_base_acc,
+            to: bonus_base_acc,
             authority: swap_acc,
-            amount: bonus_amount,
+            amount: bonus_base_amount,
             decimals: base_decimals,
         }
         .invoke_signed(&signers)?;
     }
 
     log!("Swap Completed");
-    log!("quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
+    // log!("quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
     Ok(())
 }
 

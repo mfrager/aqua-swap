@@ -7,6 +7,7 @@ use pinocchio::{
     ProgramResult,
 };
 use pinocchio_log::log;
+use aranya_base58::ToBase58;
 
 use crate::{errors::SwapError, instructions::CreateData};
 
@@ -33,6 +34,10 @@ impl DataLen for SwapState {
 impl SwapState {
     pub fn validate_pda(bump_seed: u8, uuid: u128, pda: &Pubkey) -> Result<(), ProgramError> {
         let derived = pinocchio_pubkey::derive_address(&[&uuid.to_le_bytes()[..]], Some(bump_seed), &crate::ID);
+        let pda_b58 = pda.to_base58();
+        log!("Validate PDA expected: {}", pda_b58.as_str());
+        let derived_b58 = derived.to_base58();
+        log!("Validate PDA derived: {}", derived_b58.as_str());
         if derived != *pda {
             return Err(SwapError::InvalidPDA.into());
         }

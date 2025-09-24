@@ -172,6 +172,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 name = "aqua_swap"
 version = "0.1.0"
 dependencies = [
+ "aranya-base58",
  "five8_const 1.0.0",
  "mollusk-svm",
  "mollusk-svm-bencher",
@@ -183,6 +184,25 @@ dependencies = [
  "pinocchio-token",
  "shank",
  "solana-sdk",
+]
+
+[[package]]
+name = "aranya-base58"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe988570b39738fd06cee8dfe9141cb1b6511717f9a0c3bb66a806abe8872ef"
+dependencies = [
+ "aranya-buggy",
+ "byteorder",
+]
+
+[[package]]
+name = "aranya-buggy"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd12ad901a90557f29d9cdfc4486083576b80644e0b9aeaa857e66c644e5cb8f"
+dependencies = [
+ "cfg-if",
 ]
 
 [[package]]
