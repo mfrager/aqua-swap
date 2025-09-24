@@ -6,9 +6,12 @@ use pinocchio::{
 };
 use pinocchio_log::log;
 use pinocchio_token::{
-    instructions::TransferChecked,
+    instructions::{TransferChecked, CloseAccount},
     state::{TokenAccount, Mint},
 };
+use pinocchio_system::instructions::Transfer;
+use pinocchio_associated_token_account::instructions::{Create, CreateIdempotent};
+use five8_const::decode_32_const;
 use shank::ShankAccount;
 
 use crate::states::{
@@ -23,8 +26,6 @@ use core::u64;
 pub struct SwapData {
     /// Amount of quote tokens the user is willing to pay.
     pub quote_in: u64,
-    /// Bump seed for the temporary bonus quote PDA if needed, otherwise 0.
-    pub bump_seed: u8,
 }
 
 impl DataLen for SwapData {
@@ -34,16 +35,6 @@ impl DataLen for SwapData {
 pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     log!("Begin Swap");
 
-    // Accounts as declared in instructions/mod.rs (idl_gen::Swap):
-    // 0 user_acc (signer, writable),
-    // 1 swap_acc,
-    // 2 vault_base_acc (writable),
-    // 3 vault_quote_acc (writable),
-    // 4 user_base_acc (writable),
-    // 5 user_quote_acc (writable),
-    // 6 base_mint_acc,
-    // 7 quote_mint_acc,
-    // 8 token_program
     let [
         user_acc,
         swap_acc,
@@ -53,10 +44,11 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         user_quote_acc,
         base_mint_acc,
         quote_mint_acc,
-        _bonus_base_acc,
-        _bonus_quote_acc,
-        _bonus_quote_temp_acc,
-        _token_program,
+        bonus_base_acc,
+        bonus_quote_acc,
+        wsol_temp_acc,
+        token_program_acc,
+        system_program_acc,
     ] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -80,21 +72,21 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Decode all accounts once and extract needed values
     let vault_base = TokenAccount::from_account_info(vault_base_acc)?;
-    let vault_quote = TokenAccount::from_account_info(vault_quote_acc)?;
     let user_base = TokenAccount::from_account_info(user_base_acc)?;
     let user_quote = TokenAccount::from_account_info(user_quote_acc)?;
     let base_mint = Mint::from_account_info(base_mint_acc)?;
-    let quote_mint = Mint::from_account_info(quote_mint_acc)?;
 
     // Extract all needed values immediately
     let vault_base_owner = *vault_base.owner();
-    let vault_quote_owner = *vault_quote.owner();
     let vault_base_mint = *vault_base.mint();
-    let vault_quote_mint = *vault_quote.mint();
     let user_base_mint = *user_base.mint();
     let user_quote_mint = *user_quote.mint();
     let base_decimals = base_mint.decimals();
-    let quote_decimals = quote_mint.decimals();
+    let mut quote_decimals = 9;
+    if !swap_state.quote_sol {
+        let quote_mint = Mint::from_account_info(quote_mint_acc)?;
+        quote_decimals = quote_mint.decimals();
+    }
 
     // Ownership & mint invariants + mint matching
     if swap_state.base != *vault_base_acc.key() {
@@ -106,46 +98,59 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     if vault_base_owner != *swap_acc.key() {
         return Err(crate::errors::SwapError::WrongOwnerBase.into());
     }
-    if vault_quote_owner == *swap_acc.key() {
-        return Err(crate::errors::SwapError::WrongOwnerQuote.into());
-    }
     if vault_base_mint != user_base_mint {
         return Err(crate::errors::SwapError::WrongMintBase.into());
-    }
-    if vault_quote_mint != user_quote_mint {
-        return Err(crate::errors::SwapError::WrongMintQuote.into());
     }
     if vault_base_mint != *base_mint_acc.key() {
         return Err(crate::errors::SwapError::WrongMintBase.into());
     }
-    if vault_quote_mint != *quote_mint_acc.key() {
-        return Err(crate::errors::SwapError::WrongMintQuote.into());
+
+    if !swap_state.quote_sol {
+        let vault_quote = TokenAccount::from_account_info(vault_quote_acc)?;
+        let vault_quote_owner = *vault_quote.owner();
+        let vault_quote_mint = *vault_quote.mint();
+        if vault_quote_owner == *swap_acc.key() {
+            return Err(crate::errors::SwapError::WrongOwnerQuote.into());
+        }
+        if vault_quote_mint != user_quote_mint {
+            return Err(crate::errors::SwapError::WrongMintQuote.into());
+        }
+        if vault_quote_mint != *quote_mint_acc.key() {
+            return Err(crate::errors::SwapError::WrongMintQuote.into());
+        }
+    } else {
+        if *quote_mint_acc.key() != decode_32_const("So11111111111111111111111111111111111111112") {
+            return Err(crate::errors::SwapError::WrongMintQuote.into());
+        }
     }
 
     // Drop the borrowed account structs to release borrows before transfers
     drop(vault_base);
-    drop(vault_quote);
     drop(user_base);
     drop(user_quote);
     drop(base_mint);
-    drop(quote_mint);
 
     // Compute base_out (base smallest units) from quote_in (quote smallest units) and 1e9-scaled price.
     let quote_in_units: u128 = swap_data.quote_in as u128;
     let price_scaled: u128 = swap_state.price as u128; // 1e9-scaled price of 1 base in quote
     let base_out: u64 = compute_base_units(quote_in_units, price_scaled, base_decimals, quote_decimals)?;
-
-    // Transfer quote from user to vault_quote
-    TransferChecked {
-        from: user_quote_acc,
-        mint: quote_mint_acc,
-        to: vault_quote_acc,
-        authority: user_acc,
-        amount: swap_data.quote_in as u64,
-        decimals: quote_decimals,
+    
+    let mut quote_in_bonus = 0;
+    // SPL token or WSOL/SOL
+    if swap_state.bonus_quote != 0 && *bonus_quote_acc.key() != *user_quote_acc.key() {
+        if swap_state.quote_sol {
+            log!("Bonus quote WSOL: {}", swap_state.bonus_quote);
+            // base_out_vault = base_out + swap_state.bonus_quote;
+        } else {
+            log!("Bonus quote SPL: {}", swap_state.bonus_quote);
+            // base_out_vault = base_out + swap_state.bonus_quote;
+        }
+        quote_in_bonus = swap_state.bonus_quote;
+        // let quote_ata_bonus = TokenAccount::from_account_info(bonus_quote_acc)?;
     }
-    .invoke()?;
 
+    let quote_in_vault: u64 = swap_data.quote_in.checked_sub(quote_in_bonus).ok_or(SwapError::InvalidParameters)?;
+    
     // Transfer base from vault_base to user using PDA signer
     let uuid_binding = swap_state.uuid.to_le_bytes();
     let pda_bump_bytes = [swap_state.bump_seed];
@@ -154,6 +159,114 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         Seed::from(&pda_bump_bytes[..]),
     ];
     let signers = [Signer::from(&signer_seeds[..])];
+    
+    // Transfer quote from user to vault_quot
+    if swap_state.quote_sol {
+        // Idempotent create WSOL ATA
+        CreateIdempotent {
+            funding_account: user_acc,
+            account: wsol_temp_acc,
+            wallet: swap_acc,
+            mint: quote_mint_acc,
+            system_program: system_program_acc,
+            token_program: token_program_acc,
+        }
+        .invoke_signed(&signers)?;
+
+        // First tranfer from user
+        TransferChecked {
+            from: user_quote_acc,
+            mint: quote_mint_acc, // WSOL
+            to: wsol_temp_acc,
+            authority: user_acc,
+            amount: quote_in_vault,
+            decimals: quote_decimals,
+        }
+        .invoke()?;
+
+        CloseAccount {
+            account: wsol_temp_acc,
+            destination: user_acc,
+            authority: swap_acc,
+        }
+        .invoke_signed(&signers)?;
+        
+        // Transfer SOL from user acc to swap_state.quote
+        Transfer {
+            from: user_acc,
+            to: vault_quote_acc,
+            lamports: quote_in_vault,
+        }
+        .invoke()?;
+    } else {
+        TransferChecked {
+            from: user_quote_acc,
+            mint: quote_mint_acc,
+            to: vault_quote_acc,
+            authority: user_acc,
+            amount: quote_in_vault,
+            decimals: quote_decimals,
+        }
+        .invoke()?;
+    }
+
+    // SPL token or WSOL/SOL
+    if quote_in_bonus > 0 {
+        if swap_state.quote_sol {
+            // Transfer to swap_state.quote as a regular lamports balance
+            // Receive as wrapped SOL to an WSOL ATA owned by the swap account
+
+            Create {
+                funding_account: user_acc,
+                account: wsol_temp_acc,
+                wallet: swap_acc,
+                mint: quote_mint_acc,
+                system_program: system_program_acc,
+                token_program: token_program_acc,
+            }
+            .invoke_signed(&signers)?;
+
+            // Transfer WSOL
+            TransferChecked {
+                from: user_quote_acc,
+                mint: quote_mint_acc,
+                to: wsol_temp_acc,
+                authority: user_acc,
+                amount: quote_in_bonus,
+                decimals: quote_decimals,
+            }
+            .invoke()?;
+
+            // Close WSOL ATA
+            CloseAccount {
+                account: wsol_temp_acc,
+                destination: user_acc,
+                authority: swap_acc,
+            }
+            .invoke_signed(&signers)?; 
+
+            Transfer {
+                from: user_acc,
+                to: bonus_quote_acc,
+                lamports: quote_in_bonus,
+            }
+            .invoke()?;
+        } else {
+            //let _quote_ata_bonus = TokenAccount::from_account_info(bonus_quote_acc)?;
+            // TODO: validate bonus_quote_acc
+            TransferChecked {
+                from: user_quote_acc,
+                mint: quote_mint_acc,
+                to: bonus_quote_acc,
+                authority: user_acc,
+                amount: quote_in_bonus,
+                decimals: quote_decimals,
+            }
+            .invoke()?;
+        }
+    }
+
+    // Base tokens
 
     TransferChecked {
         from: vault_base_acc,
@@ -165,10 +278,79 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     }
     .invoke_signed(&signers)?;
 
+    // Always SPL token
+    if swap_state.bonus_base != 0 && *bonus_base_acc.key() != *user_base_acc.key() {
+        let base_ata_bonus = TokenAccount::from_account_info(bonus_base_acc)?;
+        if *base_ata_bonus.mint() != *base_mint_acc.key() {
+            return Err(SwapError::WrongMintBase.into());
+        }
+        let bonus_amount = calculate_base_bonus(swap_state.bonus_base as u128, base_out)?;
+        log!("Bonus base: {}", bonus_amount);
+        TransferChecked {
+            from: bonus_base_acc,
+            mint: base_mint_acc,
+            to: user_base_acc,
+            authority: swap_acc,
+            amount: bonus_amount,
+            decimals: base_decimals,
+        }
+        .invoke_signed(&signers)?;
+    }
+
     log!("Swap Completed");
     log!("quote_in={} -> base_out={} price={}", swap_data.quote_in, base_out, swap_state.price);
     Ok(())
 }
+
+/// Calculate base token bonus based on percentage
+/// 
+/// # Arguments
+/// * `bonus_percentage` - Bonus percentage scaled by 1e9 (100 billion = 100%)
+/// * `base_out` - Base tokens output from the swap
+/// 
+/// # Returns
+/// * `Result<u64, ProgramError>` - Bonus amount in base token smallest units
+/// 
+/// # Formula
+/// bonus_amount = (base_out * bonus_percentage) / 100_000_000_000
+/// 
+/// # Examples
+/// * bonus_percentage = 0 -> bonus_amount = 0 (0%)
+/// * bonus_percentage = 1_000_000_000 -> bonus_amount = base_out * 0.01 (1%)
+/// * bonus_percentage = 100_000_000_000 -> bonus_amount = base_out (100%)
+#[inline(always)]
+fn calculate_base_bonus(
+    bonus_percentage: u128,
+    base_out: u64,
+) -> Result<u64, ProgramError> {
+    // If no bonus, return 0
+    if bonus_percentage == 0 {
+        return Ok(0);
+    }
+    
+    // Convert base_out to u128 for calculation
+    let base_out_128 = base_out as u128;
+    
+    // Calculate bonus: (base_out * bonus_percentage) / 100_000_000_000
+    // This gives us the bonus amount in base token smallest units
+    let numerator = base_out_128
+        .checked_mul(bonus_percentage)
+        .ok_or(SwapError::InvalidParameters)?;
+    
+    let denominator = 100_000_000_000u128; // 100 billion (100%)
+    
+    let bonus_amount = numerator
+        .checked_div(denominator)
+        .ok_or(SwapError::InvalidParameters)?;
+    
+    // Ensure the result fits in u64
+    if bonus_amount > (u64::MAX as u128) {
+        return Err(SwapError::InvalidParameters.into());
+    }
+    
+    Ok(bonus_amount as u64)
+}
+
 
 #[inline(always)]
 fn compute_base_units(
@@ -245,3 +427,5 @@ fn compute_base_units(
 // - Correctness: The formula is a direct rearrangement of q = p * x, accounting for token
 //   decimals and the fixed 1e9 scaling used for the price.
 // ---
+
+

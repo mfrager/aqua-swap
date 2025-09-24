@@ -54,8 +54,9 @@ mod idl_gen {
         #[account(7, name = "quote_mint_acc", desc = "Quote mint")]
         #[account(8, writable, name = "bonus_base_acc", desc = "Bonus base token")]
         #[account(9, writable, name = "bonus_quote_acc", desc = "Bonus quote token or account")]
-        #[account(10, writable, name = "bonus_quote_temp_acc", desc = "Bonus quote temporary token")]
+        #[account(10, writable, name = "wsol_temp_acc", desc = "WSOL temporary token")]
         #[account(11, name = "token_program")]
+        #[account(12, name = "system_program")]
         Swap(SwapData),
         #[account(0, writable, signer, name = "owner_acc", desc = "Owner account")]
         #[account(1, writable, name = "swap_acc", desc = "Swap account")]

@@ -23,6 +23,7 @@ pub struct SwapState {
     pub bonus_quote: u64,
     pub bump_seed: u8,
     pub quote_sol: bool,
+    pub require_verify: bool,
 }
 
 impl DataLen for SwapState {
@@ -46,6 +47,7 @@ impl SwapState {
         quote_acc: &AccountInfo,
         create_data: &CreateData,
         quote_sol: bool,
+        quote_owner: Pubkey,
     ) -> ProgramResult {
         let swap_data = unsafe { load_acc_mut_unchecked::<SwapState>(swap_acc.borrow_mut_data_unchecked()) }?;
         swap_data.price = create_data.price;
@@ -56,7 +58,11 @@ impl SwapState {
         swap_data.owner = *owner_acc.key();
         swap_data.verify = *verify_acc.key();
         swap_data.base = *base_acc.key();
-        swap_data.quote = *quote_acc.key();
+        if quote_sol {
+            swap_data.quote = quote_owner;
+        } else {
+            swap_data.quote = *quote_acc.key();
+        }
         swap_data.quote_sol = quote_sol;
 
         log!("SwapState uuid: {}", swap_data.uuid);

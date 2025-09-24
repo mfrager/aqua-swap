@@ -6,7 +6,7 @@ use pinocchio::{
     sysvars::rent::Rent,
     ProgramResult,
 };
-use five8_const;
+use five8_const::decode_32_const;
 use shank::ShankAccount;
 use pinocchio_log::log;
 use pinocchio_system::instructions::CreateAccount;
@@ -27,6 +27,7 @@ pub struct CreateData {
     pub bonus_base: u64,
     pub bonus_quote: u64,
     pub bump_seed: u8,
+    pub require_verify: bool,
 }
 
 impl DataLen for CreateData {
@@ -63,8 +64,9 @@ pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(SwapError::InvalidParameters.into());
     }
     let mut quote_sol: bool = false;
+    let quote_owner = *quote_token.owner();
 
-    if *quote_token.mint() == five8_const::decode_32_const("So11111111111111111111111111111111111111112") {
+    if *quote_token.mint() == decode_32_const("So11111111111111111111111111111111111111112") {
         quote_sol = true;
     }
 
@@ -84,7 +86,7 @@ pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         lamports: rent.minimum_balance(SwapState::LEN),
     }
     .invoke_signed(&signers)?;
-    SwapState::create_swap(swap_acc, owner_acc, verify_acc, base_acc, quote_acc, ix_data, quote_sol)?;
+    SwapState::create_swap(swap_acc, owner_acc, verify_acc, base_acc, quote_acc, ix_data, quote_sol, quote_owner)?;
     log!("Swap Created");
     Ok(())
 }
