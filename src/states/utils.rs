@@ -1,4 +1,5 @@
 use pinocchio::program_error::ProgramError;
+use crate::errors::SwapError;
 
 pub trait DataLen {
     const LEN: usize;
@@ -7,7 +8,7 @@ pub trait DataLen {
 #[inline(always)]
 pub unsafe fn load_acc_unchecked<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
-        return Err(ProgramError::InvalidAccountData);
+        return Err(SwapError::InvalidAccountDataLoadUnchecked.into());
     }
     Ok(&*(bytes.as_ptr() as *const T))
 }
@@ -15,7 +16,7 @@ pub unsafe fn load_acc_unchecked<T: DataLen>(bytes: &[u8]) -> Result<&T, Program
 #[inline(always)]
 pub unsafe fn load_acc_mut_unchecked<T: DataLen>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
     if bytes.len() != T::LEN {
-        return Err(ProgramError::InvalidAccountData);
+        return Err(SwapError::InvalidAccountDataLoadMutUnchecked.into());
     }
     Ok(&mut *(bytes.as_mut_ptr() as *mut T))
 }
@@ -23,7 +24,7 @@ pub unsafe fn load_acc_mut_unchecked<T: DataLen>(bytes: &mut [u8]) -> Result<&mu
 #[inline(always)]
 pub unsafe fn load_ix_data<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
-        return Err(ProgramError::InvalidInstructionData);
+        return Err(SwapError::InvalidInstructionDataUtilsLoad.into());
     }
     Ok(&*(bytes.as_ptr() as *const T))
 }

@@ -19,7 +19,7 @@ import {
 } from '../instructions';
 
 export const AQUA_SWAP_PROGRAM_ADDRESS =
-  '26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ' as Address<'26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ'>;
+  'SWAPmcsgGvfZMoHjp9wSMnGk5S2nVHxCwYAGfta9Vyp' as Address<'SWAPmcsgGvfZMoHjp9wSMnGk5S2nVHxCwYAGfta9Vyp'>;
 
 export enum AquaSwapAccount {
   CreateData,
@@ -52,7 +52,7 @@ export function identifyAquaSwapInstruction(
 }
 
 export type ParsedAquaSwapInstruction<
-  TProgram extends string = '26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ',
+  TProgram extends string = 'SWAPmcsgGvfZMoHjp9wSMnGk5S2nVHxCwYAGfta9Vyp',
 > =
   | ({
       instructionType: AquaSwapInstruction.Create;

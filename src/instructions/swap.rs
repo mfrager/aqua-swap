@@ -4,7 +4,6 @@ use pinocchio::{
     program_error::ProgramError,
     ProgramResult,
 };
-use aranya_base58::ToBase58;
 use pinocchio_log::log;
 use pinocchio_token::{
     instructions::{TransferChecked, CloseAccount},
@@ -52,20 +51,20 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         system_program_acc,
         _ata_program_acc,
     ] = accounts else {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        return Err(SwapError::NotEnoughAccountKeysSwap.into());
     };
 
     if !user_acc.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+        return Err(SwapError::MissingRequiredSignatureSwap.into());
     }
 
     // log!("Data length: {}, expected: {}", data.len(), SwapData::LEN);
     if data.len() != SwapData::LEN {
-        return Err(ProgramError::InvalidInstructionData);
+        return Err(SwapError::InvalidInstructionDataSwapLength.into());
     }
     let swap_data = unsafe { *(data.as_ptr() as *const SwapData) };
     if swap_data.quote_in == 0 {
-        return Err(ProgramError::InvalidInstructionData);
+        return Err(SwapError::InvalidInstructionDataSwapQuoteInZero.into());
     }
 
     // Load swap state
@@ -91,19 +90,19 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Ownership & mint invariants + mint matching
     if swap_state.base != *vault_base_acc.key() {
-        return Err(crate::errors::SwapError::WrongVaultBase.into());
+        return Err(crate::errors::SwapError::WrongVaultBaseSwap.into());
     }
     if swap_state.quote != *vault_quote_acc.key() {
-        return Err(crate::errors::SwapError::WrongVaultQuote.into());
+        return Err(crate::errors::SwapError::WrongVaultQuoteSwap.into());
     }
     if vault_base_owner != *swap_acc.key() {
-        return Err(crate::errors::SwapError::WrongOwnerBase.into());
+        return Err(crate::errors::SwapError::WrongOwnerBaseSwapVault.into());
     }
     if vault_base_mint != user_base_mint {
-        return Err(crate::errors::SwapError::WrongMintBase.into());
+        return Err(crate::errors::SwapError::WrongMintBaseSwapVaultUser.into());
     }
     if vault_base_mint != *base_mint_acc.key() {
-        return Err(crate::errors::SwapError::WrongMintBase.into());
+        return Err(crate::errors::SwapError::WrongMintBaseSwapVaultMint.into());
     }
 
     if !swap_state.quote_sol {
@@ -111,17 +110,17 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         let vault_quote_owner = *vault_quote.owner();
         let vault_quote_mint = *vault_quote.mint();
         if vault_quote_owner == *swap_acc.key() {
-            return Err(crate::errors::SwapError::WrongOwnerQuote.into());
+            return Err(crate::errors::SwapError::WrongOwnerQuoteSwapVault.into());
         }
         if vault_quote_mint != user_quote_mint {
-            return Err(crate::errors::SwapError::WrongMintQuote.into());
+            return Err(crate::errors::SwapError::WrongMintQuoteSwapVaultUser.into());
         }
         if vault_quote_mint != *quote_mint_acc.key() {
-            return Err(crate::errors::SwapError::WrongMintQuote.into());
+            return Err(crate::errors::SwapError::WrongMintQuoteSwapVaultMint.into());
         }
     } else {
         if *quote_mint_acc.key() != decode_32_const("So11111111111111111111111111111111111111112") {
-            return Err(crate::errors::SwapError::WrongMintQuote.into());
+            return Err(crate::errors::SwapError::WrongMintQuoteSwapSolMint.into());
         }
     }
 
@@ -135,15 +134,19 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let quote_in_units: u128 = swap_data.quote_in as u128;
     let price_scaled: u128 = swap_state.price as u128; // 1e9-scaled price of 1 base in quote
     let base_out: u64 = compute_base_units(quote_in_units, price_scaled, base_decimals, quote_decimals)?;
+
+    if base_out == 0 {
+        return Err(SwapError::InvalidParametersBaseUnitsResultZero.into());
+    }
     
     let mut quote_in_bonus = 0;
     // SPL token or WSOL/SOL
     if swap_state.bonus_quote != 0 && *bonus_quote_acc.key() != *user_quote_acc.key() {
         quote_in_bonus = calculate_quote_bonus(swap_state.bonus_quote, swap_data.quote_in)?;
-        log!("Quote bonus: {}", quote_in_bonus);
+        // log!("Quote bonus: {}", quote_in_bonus);
     }
 
-    let quote_in_vault: u64 = swap_data.quote_in.checked_sub(quote_in_bonus).ok_or(SwapError::InvalidParameters)?;
+    let quote_in_vault: u64 = swap_data.quote_in.checked_sub(quote_in_bonus).ok_or(SwapError::InvalidParametersQuoteInVaultSubtraction)?;
     
     // Transfer base from vault_base to user using PDA signer
     let uuid_binding = swap_state.uuid.to_le_bytes();
@@ -157,7 +160,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     // Transfer quote from user to vault_quot
     if swap_state.quote_sol {
         // Idempotent create WSOL ATA
-        log!("Create temp WSOL ATA");
+        // log!("Create temp WSOL ATA");
         CreateIdempotent {
             funding_account: user_acc,
             account: wsol_temp_acc,
@@ -169,7 +172,6 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         .invoke_signed(&signers)?;
 
         // First tranfer from user
-        log!("Transfer quote from user to temp WSOL ATA");
         TransferChecked {
             from: user_quote_acc,
             mint: quote_mint_acc, // WSOL
@@ -180,7 +182,6 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         }
         .invoke()?;
 
-        log!("Close temp WSOL ATA");
         CloseAccount {
             account: wsol_temp_acc,
             destination: user_acc,
@@ -189,7 +190,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         .invoke_signed(&signers)?;
         
         // Transfer SOL from user acc to swap_state.quote
-        log!("Transfer SOL from user to vault");
+        log!("Transfer SOL from user to vault: {}", quote_in_vault);
         Transfer {
             from: user_acc,
             to: vault_quote_acc,
@@ -244,6 +245,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
             }
             .invoke_signed(&signers)?; 
 
+            log!("Transfer SOL from user to bonus: {}", quote_in_bonus);
             Transfer {
                 from: user_acc,
                 to: bonus_quote_acc,
@@ -252,7 +254,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
             .invoke()?;
         } else {
             //let _quote_ata_bonus = TokenAccount::from_account_info(bonus_quote_acc)?;
-            log!("Transfer quote from user to bonus: {}", quote_in_bonus);
+            log!("Transfer quote token from user to bonus: {}", quote_in_bonus);
             TransferChecked {
                 from: user_quote_acc,
                 mint: quote_mint_acc,
@@ -267,7 +269,7 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     // Base tokens
 
-    log!("Transfer base from vault to user: {}", base_out);
+    log!("Transfer base token from vault to user: {}", base_out);
     TransferChecked {
         from: vault_base_acc,
         mint: base_mint_acc,
@@ -282,14 +284,13 @@ pub fn swap(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     if swap_state.bonus_base != 0 && *bonus_base_acc.key() != *user_base_acc.key() {
         let base_ata_bonus = TokenAccount::from_account_info(bonus_base_acc)?;
         if *base_ata_bonus.mint() != *base_mint_acc.key() {
-            return Err(SwapError::WrongMintBase.into());
+            return Err(SwapError::WrongMintBaseSwapBonus.into());
         }
         let bonus_base_amount = calculate_base_bonus(swap_state.bonus_base as u128, base_out)?;
-        log!("Bonus base: {}", bonus_base_amount);
         // Drop the immutable borrow on bonus_base_acc before doing a transfer that
         // will require a (mutable) borrow of the same account.
         drop(base_ata_bonus);
-        log!("Transfer base from vault to bonus: {}", bonus_base_amount);
+        log!("Transfer base token from vault to bonus: {}", bonus_base_amount);
         TransferChecked {
             from: vault_base_acc,
             mint: base_mint_acc,
@@ -339,17 +340,17 @@ fn calculate_base_bonus(
     // This gives us the bonus amount in base token smallest units
     let numerator = base_out_128
         .checked_mul(bonus_percentage)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseBonusCalculation)?;
     
     let denominator = 100_000_000_000u128; // 100 billion (100%)
     
     let bonus_amount = numerator
         .checked_div(denominator)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseBonusOverflow)?;
     
     // Ensure the result fits in u64
     if bonus_amount > (u64::MAX as u128) {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::InvalidParametersBaseBonusOverflow.into());
     }
     
     Ok(bonus_amount as u64)
@@ -381,16 +382,16 @@ fn calculate_quote_bonus(
 
     let numerator = quote_in_128
         .checked_mul(bonus_percentage_128)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersQuoteBonusCalculation)?;
 
     let denominator = 100_000_000_000u128; // 100 * 1e9
 
     let bonus_amount = numerator
         .checked_div(denominator)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersQuoteBonusOverflow)?;
 
     if bonus_amount > (u64::MAX as u128) {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::InvalidParametersQuoteBonusOverflow.into());
     }
 
     Ok(bonus_amount as u64)
@@ -407,28 +408,28 @@ fn compute_base_units(
     // price_scaled: 1e9-scaled price of 1 base in quote (post-decimals)
     // Compute base_units = (quote_units * 10^base_decimals * 1e9) / (price_scaled * 10^quote_decimals)
     if price_scaled == 0 {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::InvalidParametersPriceScaledZero.into());
     }
     let b: u128 = 1_000_000_000u128;
     let base_scale: u128 = 10u128
         .checked_pow(base_decimals as u32)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseScaleOverflow)?;
     let quote_scale: u128 = 10u128
         .checked_pow(quote_decimals as u32)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersQuoteScaleOverflow)?;
 
     let num: u128 = quote_units
         .checked_mul(base_scale)
         .and_then(|v| v.checked_mul(b))
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseUnitsCalculation)?;
     let den: u128 = price_scaled
         .checked_mul(quote_scale)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseUnitsOverflow)?;
     let units: u128 = num
         .checked_div(den)
-        .ok_or(SwapError::InvalidParameters)?;
+        .ok_or(SwapError::InvalidParametersBaseUnitsResult)?;
     if units == 0 || units > (u64::MAX as u128) {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::InvalidParametersBaseUnitsResult.into());
     }
     Ok(units as u64)
 }

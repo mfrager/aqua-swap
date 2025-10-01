@@ -1,4 +1,5 @@
 use pinocchio::program_error::ProgramError;
+use crate::errors::SwapError;
 
 pub mod create;
 pub mod swap;
@@ -23,7 +24,7 @@ impl TryFrom<&u8> for SwapProgramInstruction {
             0 => Ok(SwapProgramInstruction::Create),
             1 => Ok(SwapProgramInstruction::Swap),
             2 => Ok(SwapProgramInstruction::Close),
-            _ => Err(ProgramError::InvalidInstructionData),
+            _ => Err(SwapError::InvalidInstructionDataModTryFrom.into()),
         }
     }
 }

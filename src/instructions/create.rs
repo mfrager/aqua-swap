@@ -1,8 +1,6 @@
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
-    program_error::ProgramError,
-    // pubkey::Pubkey,
     sysvars::rent::Rent,
     ProgramResult,
 };
@@ -46,28 +44,28 @@ pub fn create(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         _system_program,
         rent_acc
     ] = accounts else {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        return Err(SwapError::NotEnoughAccountKeysCreate.into());
     };
     if !owner_acc.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+        return Err(SwapError::MissingRequiredSignatureCreate.into());
     }
     SwapState::validate_pda(ix_data.bump_seed, ix_data.uuid, swap_acc.key())?;
     if !swap_acc.data_is_empty() {
-        return Err(ProgramError::AccountAlreadyInitialized);
+        return Err(SwapError::AccountAlreadyInitializedCreate.into());
     }
     let base_token = TokenAccount::from_account_info(base_acc)?;
     let quote_token = TokenAccount::from_account_info(quote_acc)?;
     if base_token.mint() == quote_token.mint() {
-        return Err(SwapError::SameMint.into());
+        return Err(SwapError::SameMintCreate.into());
     }
     if base_token.owner() != swap_acc.key() {
-        return Err(SwapError::WrongOwnerBase.into());
+        return Err(SwapError::WrongOwnerBaseCreate.into());
     }
     if quote_token.owner() == swap_acc.key() {
-        return Err(SwapError::WrongOwnerQuote.into());
+        return Err(SwapError::WrongOwnerQuoteCreate.into());
     }
     if ix_data.price == 0 {
-        return Err(SwapError::InvalidParameters.into());
+        return Err(SwapError::InvalidParametersCreatePrice.into());
     }
     let mut quote_sol: bool = false;
     let quote_owner = *quote_token.owner();

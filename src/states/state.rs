@@ -37,7 +37,7 @@ impl SwapState {
         let derived_b58 = derived.to_base58();
         log!("Validate PDA derived: {}", derived_b58.as_str()); */
         if derived != *pda {
-            return Err(SwapError::InvalidPDA.into());
+            return Err(SwapError::InvalidPDAValidation.into());
         }
         Ok(())
     }

@@ -10,4 +10,4 @@ pub mod errors;
 pub mod instructions;
 pub mod states;
 
-pinocchio_pubkey::declare_id!("26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ");
+pinocchio_pubkey::declare_id!("SWAPmcsgGvfZMoHjp9wSMnGk5S2nVHxCwYAGfta9Vyp");

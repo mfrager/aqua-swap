@@ -1,9 +1,10 @@
 #![allow(unexpected_cfgs)]
 
 use crate::instructions::{self, SwapProgramInstruction};
+use crate::errors::SwapError;
 use pinocchio::{
     account_info::AccountInfo, default_panic_handler, no_allocator, program_entrypoint,
-    program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+    pubkey::Pubkey, ProgramResult,
 };
 // use pinocchio_log::log;
 
@@ -22,7 +23,7 @@ fn process_instruction(
 ) -> ProgramResult {
     let (ix_disc, instruction_data) = instruction_data
         .split_first()
-        .ok_or(ProgramError::InvalidInstructionData)?;
+        .ok_or(SwapError::InvalidInstructionDataEntrypointSplit)?;
     match SwapProgramInstruction::try_from(ix_disc)? {
         SwapProgramInstruction::Create => {
             instructions::create(accounts, instruction_data)

@@ -322,34 +322,142 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidParameters"
+            "name": "InvalidParametersCreatePrice"
           },
           {
-            "name": "InvalidPDA"
+            "name": "InvalidParametersQuoteInVaultSubtraction"
           },
           {
-            "name": "WrongOwnerBase"
+            "name": "InvalidParametersBaseBonusCalculation"
           },
           {
-            "name": "WrongOwnerQuote"
+            "name": "InvalidParametersQuoteBonusCalculation"
           },
           {
-            "name": "WrongMintBase"
+            "name": "InvalidParametersBaseBonusOverflow"
           },
           {
-            "name": "WrongMintQuote"
+            "name": "InvalidParametersQuoteBonusOverflow"
           },
           {
-            "name": "WrongVaultBase"
+            "name": "InvalidParametersPriceScaledZero"
           },
           {
-            "name": "WrongVaultQuote"
+            "name": "InvalidParametersBaseScaleOverflow"
           },
           {
-            "name": "SameMint"
+            "name": "InvalidParametersQuoteScaleOverflow"
           },
           {
-            "name": "NotOwner"
+            "name": "InvalidParametersBaseUnitsCalculation"
+          },
+          {
+            "name": "InvalidParametersBaseUnitsOverflow"
+          },
+          {
+            "name": "InvalidParametersBaseUnitsResult"
+          },
+          {
+            "name": "InvalidParametersBaseUnitsResultZero"
+          },
+          {
+            "name": "InvalidInstructionDataEntrypointSplit"
+          },
+          {
+            "name": "InvalidInstructionDataSwapLength"
+          },
+          {
+            "name": "InvalidInstructionDataSwapQuoteInZero"
+          },
+          {
+            "name": "InvalidInstructionDataModTryFrom"
+          },
+          {
+            "name": "InvalidInstructionDataUtilsLoad"
+          },
+          {
+            "name": "InvalidAccountDataLoadUnchecked"
+          },
+          {
+            "name": "InvalidAccountDataLoadMutUnchecked"
+          },
+          {
+            "name": "NotEnoughAccountKeysCreate"
+          },
+          {
+            "name": "NotEnoughAccountKeysSwap"
+          },
+          {
+            "name": "NotEnoughAccountKeysClose"
+          },
+          {
+            "name": "MissingRequiredSignatureCreate"
+          },
+          {
+            "name": "MissingRequiredSignatureSwap"
+          },
+          {
+            "name": "MissingRequiredSignatureClose"
+          },
+          {
+            "name": "AccountAlreadyInitializedCreate"
+          },
+          {
+            "name": "InvalidPDAValidation"
+          },
+          {
+            "name": "WrongOwnerBaseCreate"
+          },
+          {
+            "name": "WrongOwnerBaseSwapVault"
+          },
+          {
+            "name": "WrongOwnerBaseCloseVault"
+          },
+          {
+            "name": "WrongOwnerQuoteCreate"
+          },
+          {
+            "name": "WrongOwnerQuoteSwapVault"
+          },
+          {
+            "name": "WrongMintBaseCreate"
+          },
+          {
+            "name": "WrongMintBaseSwapVaultUser"
+          },
+          {
+            "name": "WrongMintBaseSwapVaultMint"
+          },
+          {
+            "name": "WrongMintBaseSwapBonus"
+          },
+          {
+            "name": "WrongMintBaseClose"
+          },
+          {
+            "name": "WrongMintQuoteSwapVaultUser"
+          },
+          {
+            "name": "WrongMintQuoteSwapVaultMint"
+          },
+          {
+            "name": "WrongMintQuoteSwapSolMint"
+          },
+          {
+            "name": "WrongVaultBaseSwap"
+          },
+          {
+            "name": "WrongVaultBaseClose"
+          },
+          {
+            "name": "WrongVaultQuoteSwap"
+          },
+          {
+            "name": "SameMintCreate"
+          },
+          {
+            "name": "NotOwnerClose"
           }
         ]
       }
@@ -357,6 +465,6 @@
   ],
   "metadata": {
     "origin": "shank",
-    "address": "26iQhBNLcPpV5gQnbCAqLR9m1rY7ZG88Qvmm2yLTKUiQ"
+    "address": "SWAPmcsgGvfZMoHjp9wSMnGk5S2nVHxCwYAGfta9Vyp"
   }
 }

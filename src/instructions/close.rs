@@ -1,7 +1,6 @@
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
-    program_error::ProgramError,
     ProgramResult,
 };
 use pinocchio_log::log;
@@ -20,12 +19,12 @@ use crate::{
 pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
     log!("Close Swap");
     let [owner_acc, swap_acc, vault_base_acc, owner_base_acc, _token_program] = accounts else {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        return Err(SwapError::NotEnoughAccountKeysClose.into());
     };
 
     // Validate owner is signer
     if !owner_acc.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+        return Err(SwapError::MissingRequiredSignatureClose.into());
     }
 
     // Load and validate swap state
@@ -33,12 +32,12 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
     
     // Validate owner matches
     if swap_state.owner != *owner_acc.key() {
-        return Err(SwapError::NotOwner.into());
+        return Err(SwapError::NotOwnerClose.into());
     }
 
     // Validate vault base account matches
     if swap_state.base != *vault_base_acc.key() {
-        return Err(SwapError::WrongVaultBase.into());
+        return Err(SwapError::WrongVaultBaseClose.into());
     }
 
     // Load vault base token account and extract needed values
@@ -57,11 +56,11 @@ pub fn close(accounts: &[AccountInfo], _data: &[u8]) -> ProgramResult {
 
     // Validate token accounts
     if vault_mint != owner_mint {
-        return Err(SwapError::WrongMintBase.into());
+        return Err(SwapError::WrongMintBaseClose.into());
     }
 
     if vault_owner != *swap_acc.key() {
-        return Err(SwapError::WrongOwnerBase.into());
+        return Err(SwapError::WrongOwnerBaseCloseVault.into());
     }
 
     // If there are tokens to transfer, do the transfer
